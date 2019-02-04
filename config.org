@@ -404,7 +404,8 @@ Config for emacs daemon and non-daemon.
 #+END_SRC
 
 ** modeline
-Smart mode line. Try sml/apply-theme if want more.
+- Smart mode line. Try sml/apply-theme if want more.
+- Diminish used to hide minor info
 
 #+BEGIN_SRC emacs-lisp
   (setq display-time-default-load-average nil
@@ -421,6 +422,10 @@ Smart mode line. Try sml/apply-theme if want more.
     (sml/setup)
     (add-to-list 'sml/replacer-regexp-list '(".*/archive" ":AR:"))
     (add-to-list 'sml/replacer-regexp-list '(".**/archiveserver" ":AS:")))
+
+  (use-package diminish
+    :init
+    (diminish 'y/basic-keybind-mode))
 #+END_SRC
 
 ** mouse
@@ -428,7 +433,7 @@ Disable mouse globally.
 #+BEGIN_SRC emacs-lisp
   ;; disable mouse at all
   (use-package disable-mouse
-    :diminish
+    :diminish global-disable-mouse-mode
     :init
     (global-disable-mouse-mode))
 #+END_SRC
@@ -454,6 +459,122 @@ and select zenburn as default.
 
   ;; my favorite theme
   (load-theme 'zenburn t)
+#+END_SRC
+
+* Platform Specific
+** Windows
+#+BEGIN_SRC emacs-lisp
+  (when (string-equal system-type "windows-nt")
+    (unless (getenv "HOME")
+      (warn "Maybe you forgot to set environment variable HOME."))
+
+    ;; M-w: paste, bind to kill-ring-save
+    (w32-register-hot-key [M-w])
+    ;; C-M-n: sp-up-sexp
+    (w32-register-hot-key [C-M-n]))
+#+END_SRC
+
+** Mac
+#+BEGIN_SRC emacs-lisp
+  (when (memq window-system '(mac ns x))
+    (use-package exec-path-from-shell
+      :quelpa (exec-path-from-shell :fetcher github
+                                    :repo "purcell/exec-path-from-shell"
+                                    :stable t)
+      :demand t
+      :init
+      (exec-path-from-shell-initialize)))
+
+  ;; Copy from https://github.com/bbatsov/prelude/blob/master/core/prelude-macos.el
+  (defun y/swap-meta-and-super()
+    "Swap the mapping of Meta and Super.
+  Very useful for people using their Mac with a
+  Windows external keyboard from time to time."
+    (interactive)
+    (if (eq mac-command-modifier 'super)
+        (progn
+          (setq mac-command-modifier 'meta)
+          (setq mac-option-modifier 'super)
+          (message "Command is now bound to META and Option is bound to SUPER."))
+      (setq mac-command-modifier 'super)
+      (setq mac-option-modifier 'meta)
+      (message "Command is now bound to SUPER and Option is bound to META.")))
+
+  ;; m for mac, s for swap
+  ;; (define-key global-map (kbd "C-c m s") 'y/swap-meta-and-super)
+
+  ;; map super to meta
+  (setq mac-command-modifier 'meta)
+#+END_SRC
+
+* Efficiency
+** company -complete anything
+company is a text completion framework. It means COMplete ANYthing.
+Gitub https://github.com/company-mode/company-mode.
+
+The company configuration varies greatly for different major modes, and when
+use emacs, company config will always be adjusted or optimized. So the total
+configurations are complex and huge. If still use orgmode babel to maintain
+company config, the config will be scattered everywhere. Therefore, I put all
+company config in a special file y-init-company.el to enhance maintenance.
+
+Material:
+- Manual: https://company-mode.github.io/
+
+#+BEGIN_SRC emacs-lisp
+  (require 'y-init-company)
+#+END_SRC
+
+** eldoc - minor mode for lisp
+#+BEGIN_SRC emacs-lisp
+  ;; builtin
+  (require 'eldoc)
+  (setq eldoc-idle-delay 0)
+  (add-hook 'emacs-lisp-mode-hook 'eldoc-mode)
+  (add-hook 'lisp-mode-hook 'eldoc-mode)
+  (add-hook 'lisp-interaction-mode-hook 'eldoc-mode)
+  (diminish 'eldoc-mode)
+#+END_SRC
+
+** hungry delete - performance for all mode
+#+BEGIN_SRC emacs-lisp
+  (use-package hungry-delete
+    :diminish
+    :hook
+    (after-init . global-hungry-delete-mode))
+#+END_SRC
+
+** smartparens
+Smartparens is a minor mode for dealing with pairs in Emacs.
+- Github: https://github.com/Fuco1/smartparens
+- Blog: https://ebzzry.io/en/emacs-pairs/
+- Wiki: https://github.com/Fuco1/smartparens/wiki
+- ref [[https://ebzzry.io/en/emacs-pairs/][emacs-pairs]], [[https://github.com/Fuco1/smartparens][smartparens github]], and [[https://github.com/Fuco1/smartparens/wiki][wiki]]
+
+#+BEGIN_SRC emacs-lisp
+  (use-package smartparens
+    :diminish
+    :config
+    (require 'smartparens-config)
+    (setq sp-base-key-bindings 'paredit)
+    (setq sp-autoskip-closing-pair 'always)
+    (setq sp-hybrid-kill-entire-symbol nil)
+    (sp-use-paredit-bindings)
+    (show-smartparens-global-mode t)
+    ;; use eval-when-compile or with-eval-after-load can eliminate warning:
+    ;; ‘sp-local-pair’ might not be defined at runtime
+    ;; But when start daemon cause a new error:
+    ;;  Eager macro-expansion failure: (void-function sp-local-pair)
+    (sp-local-pair 'lisp-mode "'" nil :actions nil)
+    (sp-local-pair 'emacs-lisp-mode "'" nil :actions nil)
+    (sp-local-pair 'lisp-interaction-mode "'" nil :actions nil)
+    (sp-local-pair 'lisp-mode "`" nil :actions nil)
+    (sp-local-pair 'emacs-lisp-mode "`" nil :actions nil)
+    (sp-local-pair 'lisp-interaction-mode "`" nil :actions nil)
+    :hook
+    (after-init     . smartparens-global-mode)
+    (after-init     . show-smartparens-global-mode)
+    (c-mode-common  . turn-on-smartparens-strict-mode))
 #+END_SRC
 
 * Footer
