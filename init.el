@@ -1,0 +1,242 @@
+;;; ~/.emacs.d/init.el --- Emacs Initialization/Customization File
+
+;; Copyright (C) 2017-2019 yonggang.yyg<yygcode@gmail.com>
+
+;; Author: yonggang.yyg<yygcode@gmail.com>
+;; Maintainer: yonggang.yyg<yygcode@gmail.com>
+;; Keyword: Emacs Initialization Customization Configuration
+;; Homepage: https://ycode.org; http://ycode.org;
+;; URL: http://github.com/yygcode/.emacs.d
+
+;; This program is free software; you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation; either version 2 of the License, or
+;; (at your option) any later version.
+
+;; This program is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+
+;; You should have received a copy of the GNU General Public License
+;; along with this program; see the file COPYING, if not see
+;; <http://www.gnu.org/licenses/>.
+
+;;; Commentary:
+
+;; Emacs base customization, includes package-tool, proxy and org-babel
+;; then use config.org to deep customize.
+;;
+;; Enviroment Variable Description
+;;
+;; EMACS_Y_PACKAGE_NO_MIRROR:
+;;   Set a non empty value to disable package mirror.  I use tsinghua mirror
+;;   because the official melpa sites are blocked by GFW. However, I use
+;;   official website if https_proxy or http_proxy are set.
+;;   e.g.: export EMACS_Y_PACKAGE_NO_MIRROR=1
+;;
+;; EMACS_Y_PACKAGE_FORCE_MIRROR:
+;;   Set a non empty value to force use tsinghua mirror site even if proxy is
+;;   set. And emacs will remove proxy set too.
+;;   e.g.: export EMACS_Y_PACKAGE_FORCE_MIRROR=1
+;;
+;; EMACS_Y_PACKAGE_FORCE_MIRROR_HTTP
+;;   Set a non empty value to use package mirror with http protocol.  Please
+;;   do not set this env if your system support SSL/TLS(https).
+;;   e.g.: export EMACS_Y_PACKAGE_FORCE_MIRROR_HTTP=1
+;;
+;; http_proxy, https_proxy, HTTP_PROXY, HTTPS_PROXY
+;;   Proxy configure.  Turn back to use official website if proxy is set.
+;;   e.g.: export https_proxy=http://127.0.0.1:8888
+
+;;; Code:
+
+(when (version< emacs-version "26.1")
+  (warn "This config does not test for emacs version before 26.1"))
+
+;; disable trival compile warnings
+(setq byte-compile-warnings
+      '(redefine callargs obsolete noruntime cl-functions interactive-only
+        make-local mapcar constants suspicious lexical))
+
+;; garbage collection change to 64MB for performance optimize
+(setq gc-cons-threshold (* 64 1024 1024))
+
+;; Define as early as possible.
+(defconst user-init-config (expand-file-name "config.org" user-emacs-directory)
+  "File name, including directory, of initialization file by org-babel.")
+
+;;; My Helper/Common routine
+(add-to-list 'load-path (expand-file-name "lisp" user-emacs-directory))
+
+;;; Proxy environment process
+(defvar y/no-proxy-list (mapconcat 'identity
+                         '("*.cn"
+                          "*.jd.com"
+                          "*.baidu.com"
+                          "*.bing.*"
+                          "*.csdn.*"
+                          "*.qq.*"
+                          ;; Please add new site
+                          ) ",")
+  "Sites list for no-proxy, only used for proxy scene.")
+(defun y/env-set(env val &optional force)
+  "Set enviroment ENV to VAL if ENV unset or FORCE is t."
+  (when (or (not (getenv env)) force)
+    (setenv env val)))
+(defun y/env-sync-partner(env1 env2)
+  "Sync enviroment ENV1/ENV2 to another if one is nil and another is non-nil."
+  (or (getenv env1) (y/env-set env1 (getenv env2)))
+  (or (getenv env2) (y/env-set env2 (getenv env1))))
+(y/env-sync-partner "https_proxy" "http_proxy")
+;; set no_proxy env if empty
+(y/env-set "no_proxy" y/no-proxy-list)
+
+;; set to utf-8-unix, otherwise pakcage install blames with
+;; 'Selecting Coding System ...'
+(prefer-coding-system 'utf-8-unix)
+
+;; package - Simple package system for Emacs. Built-in
+(require 'package)
+
+;; Archive site
+;; Emacs archives-site is isolated by GFW, use mirror site if no proxy
+(defun y/set-package-archives-official()
+  "Set package-archives to melpa.org if https-proxy enabled or FORCE non-nil."
+  (interactive)
+  (message "Set package-archives to melpa.org(official).")
+  (setq package-archives
+        '(("melpa-stable" . "https://stable.melpa.org/packages/")
+          ("melpa" . "https://melpa.org/packages/")
+          ("gnu" . "https://elpa.gnu.org/packages/")
+          ("org" . "http://orgmode.org/elpa/")
+          ("marmalade" . "https://marmalade-repo.org/packages/"))))
+
+(defun y/set-package-archives-mirror()
+  "Set package-archives to tsinghua if https-proxy disabled or FORCE non-nil."
+  (interactive)
+  (message "Set package-archives to tsinghua mirror.")
+  (setq package-archives
+        '(("gnu"   . "https://mirrors.tuna.tsinghua.edu.cn/elpa/gnu/")
+          ("org"   . "https://mirrors.tuna.tsinghua.edu.cn/elpa/org/")
+          ("melpa" . "https://mirrors.tuna.tsinghua.edu.cn/elpa/melpa/")
+          ("melpa-stable" .
+           "https://mirrors.tuna.tsinghua.edu.cn/elpa/melpa-stable/"))))
+
+;; It's not safe, only use if system does not support
+(defun y/set-package-archives-mirror-http()
+  "Set package-archives to tsinghua if https-proxy disabled or FORCE non-nil."
+  (interactive)
+  (message "Set package-archives to tsinghua mirror.")
+  (setq package-archives
+        '(("gnu"   . "http://mirrors.tuna.tsinghua.edu.cn/elpa/gnu/")
+          ("org"   . "http://mirrors.tuna.tsinghua.edu.cn/elpa/org/")
+          ("melpa" . "http://mirrors.tuna.tsinghua.edu.cn/elpa/melpa/")
+          ("melpa-stable" .
+           "http://mirrors.tuna.tsinghua.edu.cn/elpa/melpa-stable/"))))
+
+(if (or (getenv "EMACS_Y_PACKAGE_NO_MIRROR") (getenv "https_proxy"))
+    (y/set-package-archives-official)
+  (y/set-package-archives-mirror))
+
+;; Set follow env if your system does not support https
+(when (getenv "EMACS_Y_PACKAGE_FORCE_MIRROR_HTTP")
+  (y/set-package-archives-mirror-http)
+  ;; Also remove proxy config.
+  (dolist (e '("http_proxy" "https_proxy" "HTTP_PROXY" "HTTPS_PROXY"))
+          (setenv e nil)))
+
+;; FORCE_MIRROR env overrides NO_MIRROR or proxy
+(when (getenv "EMACS_Y_PACKAGE_FORCE_MIRROR")
+  (y/set-package-archives-mirror)
+  ;; Also remove proxy config.
+  (dolist (e '("http_proxy" "https_proxy" "HTTP_PROXY" "HTTPS_PROXY"))
+          (setenv e nil)))
+
+;;; package manage and org babel config
+
+(package-initialize)
+
+;; Downloads archive contents if not exists for startup performance. But the
+;; old archive contents may cause the package install to fail, then try execute
+;; function package-refresh-contents manually.
+(when (not package-archive-contents)
+  (package-refresh-contents))
+
+;; Set custom-file variable to prevent emacs mess up init.el.
+(setq custom-file (expand-file-name ".custom-auto.el" user-emacs-directory))
+;; All config is maintained manally. If you want some temporary configuration to
+;; take effect permanently, open the below comment.
+;; (load custom-file t)
+
+;; use-package simplifies emacs packages install and config.
+;; GitHub: https://github.com/jwiegley/use-package
+;; HomePage: https://jwiegley.github.io/use-package/
+(unless (or (package-installed-p 'use-package)
+            (package-install 'use-package))
+  (error "Install use-package failed."))
+(eval-when-compile
+  (require 'use-package)
+  (setq use-package-always-ensure t)
+  (setq use-package-always-pin "melpa-stable")
+  (setq use-package-always-defer t))
+
+;; quelpa - Install Emacs Lisp packages from source code.
+;; https://github.com/quelpa/quelpa
+(use-package quelpa
+  :pin melpa
+  :init
+  ;; disable auto-upgrade for startup performance
+  ;; call y/upgrade-quelpa manually if necessary
+  (setq quelpa-checkout-melpa-p t)
+  (setq quelpa-self-upgrade-p nil)
+  (setq quelpa-update-melpa-p nil)
+  (setq quelpa-stable-p t))
+
+;; Provide quelpa option to use-package
+;; https://github.com/quelpa/quelpa-use-package
+(use-package quelpa-use-package
+  :pin melpa
+  :init
+  (require 'quelpa-use-package)
+  ;; I set use-package-always-ensure, so need advice here
+  ;; https://github.com/quelpa/quelpa-use-package#overriding-use-package-always-ensure
+  (quelpa-use-package-activate-advice))
+
+;; Reload init emacs.
+;; But reload is different with restart, old config may be left. e.g. key bind.
+(global-set-key (kbd "C-c q r")
+                #'(lambda()(interactive) (load-file user-init-file)))
+
+;;; Emacs deep config with Org-mode literate programming
+
+;; If you want to use the latest org, use the follows config:
+;; 1. Download latest package or clone repo.
+;;    URL: http://orgmode.org/
+;;    REPO:
+;;      ~$ git clone git://orgmode.org/org-mode.git
+;;      ~$ make autoloads
+;; 2. add load-path
+;;    (add-to-list 'load-path "~/path/to/orgdir/lisp")
+;; 3. If you want contributed libraries
+;;    (add-to-list 'load-path "~/path/to/orgdir/contrib/lisp" t)
+;; See homepage http://orgmode.org/ for more details.
+
+;; use-package use 'package-installed-p' to check package installed or not
+;; and org is a built-in package, so use-package would ignore org package
+;; but org-plus-contrib is not installed default, so I think I can force install
+;; org by routine package-install but failed.
+(use-package org
+  :pin org
+  :init
+  (setq org-support-shift-select t)
+  (setq org-src-fontify-natively t))
+(use-package org-plus-contrib
+  :pin org)
+
+;; load literate config.
+(when (and (file-exists-p user-init-config)
+           (not (string= (getenv "EMACS_Y_INTERNAL_ESUP_PROFILER") "y/esup")))
+  (org-babel-load-file user-init-config))
+
+;;; init.el ends here

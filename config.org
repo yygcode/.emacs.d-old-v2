@@ -1,0 +1,478 @@
+#+TITLE: Emacs Configuration Org File
+#+AUTHOR: yonggang.yyg
+#+EMAIL: yygcode@gmail.com
+#+DATE: 2017-12-20
+
+* Header
+  :PROPERTIES:
+  :CUSTOM_ID: header
+  :END:
+
+This section has no actual effect, you can remove this section safely. It's just
+used to generate some format code snippets to help auto-generated file config.el
+satisfing the elisp file format requirement. Refer to follow links:
+- CheckDoc: http://cedet.sourceforge.net/checkdoc.shtml
+- EmacsWiKi: https://www.emacswiki.org/emacs/ElispAreaConventions
+- Manual Simple Packages:
+https://www.gnu.org/software/emacs/manual/html_node/elisp/Simple-Packages.html
+#+BEGIN_SRC emacs-lisp
+  ;;; ~/.emacs.d/config.el --- Emacs Configuration File
+
+  ;; Copyright (C) 2017-2019 yanyg<yygcode@gmail.com>
+
+  ;; Author: yonggang.yyg<yygcode@gmail.com>
+  ;; Maintainer: yonggang.yyg<yygcode@gmail.com>
+  ;; Keyword: Emacs Customize Org Literate
+  ;; Homepage: https://ycode.org; http://ycode.org
+  ;; URL: http://github.com/yygcode/.emacs.d
+
+  ;; This program is free software; you can redistribute it and/or modify
+  ;; it under the terms of the GNU General Public License as published by
+  ;; the Free Software Foundation; either version 2 of the License, or
+  ;; (at your option) any later version.
+
+  ;; This program is distributed in the hope that it will be useful,
+  ;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+  ;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  ;; GNU General Public License for more details.
+
+  ;; You should have received a copy of the GNU General Public License
+  ;; along with this program; see the file COPYING, if not see
+  ;; <http://www.gnu.org/licenses/>.
+
+  ;;; Commentary:
+
+  ;; This file is auto-generated with org-babel.  The source is config.org.
+  ;; DO NOT modify this file(~/.emacs.d/config.el) directly.
+  ;; Please modify source file ~/.emacs.d/config.org.
+
+  ;;; Code:
+
+  ;;; Header timestamp
+  (message "%s" (format-time-string "config.el begin %Y-%m-%d %H:%M:%S"
+                                    (current-time)))
+  ;; for startup time evaluate
+  (defconst y/time-begin-seconds (float-time))
+#+END_SRC
+
+* Profiler
+** Wrapper function
+| Function            | Description                             |
+|---------------------+-----------------------------------------|
+| y/profile-esup      | Show esup startup profiler              |
+| y/profile-tabulated | Show benchmark result in a sorted table |
+| y/profile-tree      | Show benchmark result in a call-tree    |
+
+** esup - startup profiler
+[[file:init.el][init.el]] only set package archive and org, then use org-babel load config.org
+to complete the rest(vast majority, main part) configurations. [[https://github.com/jschaf/esup][Esup]] provides
+=esup-child-profile-require-level= deep to profile require statement, but it
+can not deep to profile org-babel file. I write wrapper function =y/esup= to
+analyze config.org time proportion.
+
+- Esup GitHub: https://github.com/jschaf/esup
+- Emacs Manual Profiling:
+  https://www.gnu.org/software/emacs/manual/html_node/elisp/Profiling.html
+
+#+BEGIN_SRC emacs-lisp
+  ;; When call esup function, esup would start a new emacs process
+  ;; with option -L/-l to load esup, but until now init.el does not
+  ;; loaded, so we need load init.el first.
+  ;; Load if in esup.
+  (unless (boundp 'user-init-config)
+    (let ((file (expand-file-name "init.el" user-emacs-directory)))
+      (message "y/esup: Esup profiling, load %s now" file)
+      (load-file file)))
+
+  (use-package esup
+    ;; :quelpa (esup :fetcher github :repo "jschaf/esup" :stable nil)
+    :pin melpa
+    :init
+    ;; Current version only support 1, see bug
+    ;; https://github.com/jschaf/esup/issues/53
+    (setq esup-depth 1)
+    (setq esup-user-init-file
+          (expand-file-name (concat (file-name-base user-init-config) ".el")
+                            user-emacs-directory)))
+
+  ;; set env before esup, and clear env after esup
+  ;; because we esup config.el but we need load init.el too.
+  (advice-add 'esup :before
+              #'(lambda(&optional init-file)
+                  "y/esup: set env EMACS_Y_INTERNAL_ESUP_PROFILER."
+                  (setenv "EMACS_Y_INTERNAL_ESUP_PROFILER" "y/esup")))
+  (advice-add 'esup :after
+              #'(lambda(&optional init-file)
+                  "y/esup: clear env EMACS_Y_INTERNAL_ESUP_PROFILER."
+                  (setenv "EMACS_Y_INTERNAL_ESUP_PROFILER" nil)))
+
+  (defalias 'y/profile-esup 'esup
+    "Profiling emacs startup time.")
+#+END_SRC
+
+** benchmark - profile execution time
+*Notice* Import benchmark-init after package esup for esup enhancement.
+- GitHub: https://github.com/dholm/benchmark-init-el
+- Execute function in emacs to query result
+  + benchmark-init/show-durations-tree
+  + benchmark-init/show-durations-tabulated
+- Default disable data collection after init. Execute to enable or disbale:
+  + benchmark-init/activate
+  + benchmark-init/deactivate
+#+BEGIN_SRC emacs-lisp
+  (use-package benchmark-init
+    :init
+    (benchmark-init/activate)
+    :hook
+    ;; To disable collection of benchmark data after init is done.
+    (after-init . benchmark-init/deactivate))
+
+  (defalias 'y/profile-tabulated 'benchmark-init/show-durations-tabulated
+    "Profiling emacs startup time. Show result as a table.")
+  (defalias 'y/profile-tree 'benchmark-init/show-durations-tree
+    "Profiling emacs startup time. Show result as a tree.")
+#+END_SRC
+
+* Keybinds
+** principle
+- compat both in terminal and X windows
+- High frequency operation gives a shorter key sequence
+- Use default keybind if possible
+
+** examples
+- =(global-set-key "\C-x\C-p" #'previous-buffer)=: In selected window switch to
+  previous buffer.
+- =(global-set-key (kbd "C-x C-n") #'next-buffer)=: In seclected window switch
+  to next buffer.
+- =(mapc 'global-unset-key '([left] [right] [up] [down]))=: Remove arrow key
+- =(global-unset-key (kbd "C-x <left>"))=: Remove Key sequence =C-x <left>=
+- =(global-unset-key [24 left])=: Equivalent to the previous statament. 24 is
+  charcode for C-x. Try *C-q C-x C-b C-x=* and watch echo area.
+
+** command-frequency analysis
+See Ergo stastics: http://ergoemacs.org/emacs/command-frequency.html.
+
+keyfreq and command-log-mode are helpful packages:
+- keyfreq: https://github.com/dacap/keyfreq
+  + =M-x keyfreq-show=
+
+- command-log-mode: https://github.com/lewang/command-log-mode
+  + =M-x global-command-log-mode=
+  + =M-x clm/toggle-command-log-buffer=
+
+=open-dribble-file= is used to record all user input. =view-lossage= is used to
+display last few input keystrokes and the command run.
+
+=view-lossage= does not update when user input, write a wrapper to update
+contents dynamically.
+
+#+BEGIN_SRC emacs-lisp
+  (use-package keyfreq
+    :init
+    (setq keyfreq-file (expand-file-name ".emacs.keyfreq" user-emacs-directory)
+          keyfreq-file-lock (expand-file-name ".emacs.keyfreq.lock"
+                                              user-emacs-directory))
+    (keyfreq-mode 1)
+    (keyfreq-autosave-mode 1))
+  (use-package command-log-mode
+    :pin melpa
+    :init
+    ;; workaround for global-command-log-mode
+    (command-log-mode -1)
+    ;; Log all keystroke except self-insert-command
+    (setq clm/log-command-exceptions* '(nil self-insert-command)))
+
+  (defun y/toggle-view-lossage()
+    "Toggle auto update view-lossage."
+    (interactive)
+    (if (member 'view-lossage pre-command-hook)
+        (remove-hook 'pre-command-hook 'view-lossage)
+      (add-hook 'pre-command-hook 'view-lossage)))
+#+END_SRC
+
+** keybind help
+=which-key= is a minor mode for Emacs that displays the key bindings following
+your currently entered incomplete command (a prefix) in a popup. For example,
+after enabling the minor mode if you enter C-x and wait for the default of 1
+second the minibuffer will expand with all of the available key bindings that
+follow C-x (or as many as space allows given your settings). Github url is:
+https://github.com/justbur/emacs-which-key
+
+=describe-bindings= are used to list all defined keys.
+=describe-prefix-bindings= Describe the bindings of the prefix used to reach
+this command.
+
+#+BEGIN_SRC emacs-lisp
+  (use-package which-key
+    :init
+    ;; Do not auto start, I almost don't need it
+    ;; (which-key-mode 1)
+    (which-key-setup-side-window-right)
+    (setq which-key-use-C-h-commands nil
+          which-key-idle-delay 2.0
+          which-key-popup-type 'minibuffer)
+    :bind
+    (:map which-key-mode-map
+          ("C-x h" . which-key-C-h-dispatch)
+          ("C-c M-h" . which-key-C-h-dispatch)))
+#+END_SRC
+
+** basic keybind
+See =C-h i (elisp) Defining Minor Modes= for details.
+#+BEGIN_SRC emacs-lisp
+  (defun y/switch-buffer-scratch()
+    "Switch buffer to *scartch*."
+    (interactive)
+    (let ((newcreate (not (get-buffer "*scratch*"))))
+      (when (and (switch-to-buffer "*scratch*") newcreate)
+        (insert initial-scratch-message))))
+  (defun y/switch-buffer-init()
+    "Switch buffer to user-init-file(default init.el)."
+    (interactive)
+    (find-file user-init-file))
+  (defun y/switch-buffer-config()
+    "Switch buffer to user-init-config(default config.org)."
+    (interactive)
+    (find-file user-init-config))
+  (defun y/kill-help()
+    "Change to other window then quit-window."
+    (interactive)
+    (save-excursion
+      (and (switch-to-buffer "*Help*")
+           (kill-buffer))))
+  (defun y/display-startup-screen()
+    "Interactive for display-startup-screen"
+    (interactive)
+    (display-startup-screen))
+
+  (defalias 'y/display-about-screen 'display-about-screen)
+  (defalias 'y/display-copying 'describe-copying)
+
+  (defun y/delete-word (arg)
+    "Delete characters forward until encountering the end of a word.
+  With argument ARG, do this that many times."
+    (interactive "p")
+    (delete-region (point) (progn (forward-word arg) (point))))
+
+  (defun y/backward-delete-word (arg)
+    "Delete characters backward until encountering the beginning of a word.
+  With argument ARG, do this that many times."
+    (interactive "p")
+    (y/delete-word (- arg)))
+
+  ;; remove arrow key. comment follow three lines if you need arrow key
+  ;; e.g.: <up>, <down>, <left>, <right>
+  (mapc 'global-unset-key '([left] [right] [up] [down]))
+  (global-unset-key (kbd "C-x <left>"))
+  (global-unset-key (kbd "C-x <right>"))
+
+  (global-set-key (kbd "RET") #'newline-and-indent)
+  (global-set-key (kbd "M-d") #'y/delete-word)
+  (global-set-key (kbd "M-<backspace>") #'y/backward-delete-word)
+
+  (define-key minibuffer-local-map (kbd "C-p") #'previous-line-or-history-element)
+  (define-key minibuffer-local-map (kbd "C-n") #'next-line-or-history-element)
+
+  (define-minor-mode y/basic-keybind-mode "Basic minor keybind"
+    :lighter " y-basic-keybind"
+    :init-value t
+    :keymap
+    (let ((map (make-sparse-keymap)))
+      (define-key map (kbd "C-c q s") #'y/switch-buffer-scratch)
+      (define-key map (kbd "C-c q i") #'y/switch-buffer-init)
+      (define-key map (kbd "C-c q c") #'y/switch-buffer-config)
+      (define-key map (kbd "C-c q e") #'y/open-file-english-words)
+      (define-key map (kbd "C-h q") #'y/kill-help)
+      (define-key map (kbd "C-o") #'other-window)
+      (define-key map (kbd "M-p") #'backward-sentence)
+      (define-key map (kbd "M-n") #'forward-sentence)
+      (define-key map (kbd "C-x C-p") #'previous-buffer)
+      (define-key map (kbd "C-x C-n") #'next-buffer)
+      map))
+
+  (defun y/basic-keybind-mode-on()
+    "Active y/basic-keybind-mode"
+    (interactive)
+    (y/basic-keybind-mode 1))
+
+  (define-globalized-minor-mode y/basic-keybind-global-mode
+    y/basic-keybind-mode y/basic-keybind-mode-on)
+
+  (y/basic-keybind-global-mode 1)
+#+END_SRC
+
+* Basic Config
+** behavior
+#+BEGIN_SRC emacs-lisp
+  ;; command history.
+  (savehist-mode 1)
+  ;; auto revert if buffer not modified. In git repo we always need it.
+  (global-auto-revert-mode 1)
+
+  ;; simplify prompt
+  (defalias 'yes-or-no-p 'y-or-n-p)
+
+  ;; No backup, use git maintain file version
+  (setq-default make-backup-files nil)
+  (setq-default indent-tabs-mode nil)
+
+  (setq kill-ring-max 500
+        kill-whole-line t)
+  (setq confirm-kill-processes nil)
+
+  (delete-selection-mode t)
+  (setq large-file-warning-threshold (* 256 1024 1024)) ;; 256MB
+  (setq default-directory "~/")
+
+  ;; Restore very slow in Windows, disable it
+  (when (not (string= system-type "winows-nt"))
+    (setq desktop-path `(,user-emacs-directory)
+          desktop-dirname user-emacs-directory
+          desktop-load-locked-desktop nil ;; Do not load if locked
+          desktop-save t ;; no ask
+          ;; restoring frame is generally unexpected
+          desktop-restore-frames nil)
+    (desktop-save-mode 1))
+
+  (setq-default
+   inhibit-splash-screen t
+   initial-scratch-message
+   (concat
+    ";; This buffer is for text that is not saved, and for Lisp evaluation.\n"
+    ";; To create a file, visit it with C-x C-f and enter text in its buffer.\n\n"
+    ";; Happy hacking " (or user-login-name "<yanyg>") " - Emacs loves you!\n\n"))
+
+  (defun y/line-numbers-mode(&optional arg)
+    "Line numbers config."
+    (require 'display-line-numbers)
+    (setq display-line-numbers-grow-only t)
+    (set-face-attribute 'line-number nil
+                        :inherit 'linum
+                        :height 100
+                        :weight 'normal
+                        :slant 'italic)
+    (set-face-attribute 'line-number-current-line nil
+                        :inherit 'line-number
+                        :foreground "#FF7F00"
+                        :background "#1A1A1A")
+    (global-display-line-numbers-mode arg))
+  (add-hook 'after-init-hook #'y/line-numbers-mode)
+#+END_SRC
+
+** ui
+Config for emacs daemon and non-daemon.
+#+BEGIN_SRC emacs-lisp
+  (defun y/frame-init-ui-basic(&optional frame)
+    "Init FRAME user-interface after created."
+    (interactive)
+    (or frame
+        (setq frame (selected-frame)))
+    (with-selected-frame frame
+      ;; Hide menu, tool, scroll bar, auto fullscreen for X
+      (menu-bar-mode -1)
+      (when (display-graphic-p)
+        (set-frame-parameter nil 'fullscreen 'fullboth)
+        (scroll-bar-mode -1))
+      (when (fboundp 'tool-bar-mode)
+        (tool-bar-mode -1))
+      ;; cursor: bar with width 3, OrangeRed color, Steady mode
+      (if (display-graphic-p)
+          (progn
+            (setq-default cursor-type '(bar . 3))
+            (blink-cursor-mode -1)
+            (set-cursor-color "OrangeRed"))
+        (progn
+          ;; Only support xterm.
+          ;; FIXME: restore after exit.
+          ;; need terminal support. 6 for steady bar, 2 for box
+          ;; \e: ESC; \a: BELL; man ascii for more details.
+          (send-string-to-terminal "\e[2 q\e]12;DarkOrange1\a")))
+
+      ;; disable bell
+      (setq visible-bell nil)
+      (setq ring-bell-function 'ignore)
+
+      ;; show column and size in the mode line
+      (column-number-mode)
+      (size-indication-mode t)))
+
+  ;; daemon hook, exec after emacsclient created
+  (add-hook 'after-make-frame-functions #'y/frame-init-ui-basic)
+  ;; non-daemon
+  (unless (daemonp)
+    (add-hook 'after-init-hook 'y/frame-init-ui-basic))
+#+END_SRC
+
+** modeline
+Smart mode line. Try sml/apply-theme if want more.
+
+#+BEGIN_SRC emacs-lisp
+  (setq display-time-default-load-average nil
+        display-time-format "%k:%M %a" ;; remove %b %d
+        display-time-mode t)
+  (display-time)
+
+  (use-package smart-mode-line
+    :init
+    (setq sml/col-number-format "%02c"
+          sml/name-width 15
+          sml/no-confirm-load-theme t
+          sml/theme 'dark) ;; others: light, respectful
+    (sml/setup)
+    (add-to-list 'sml/replacer-regexp-list '(".*/archive" ":AR:"))
+    (add-to-list 'sml/replacer-regexp-list '(".**/archiveserver" ":AS:")))
+#+END_SRC
+
+** mouse
+Disable mouse globally.
+#+BEGIN_SRC emacs-lisp
+  ;; disable mouse at all
+  (use-package disable-mouse
+    :diminish
+    :init
+    (global-disable-mouse-mode))
+#+END_SRC
+
+* Theme
+Theme is another important ui aspect. Manual
+https://www.gnu.org/software/emacs/manual/html_node/emacs/Custom-Themes.html,
+https://www.gnu.org/software/emacs/manual/html_node/emacs/Creating-Custom-Themes.html
+and wiki https://www.emacswiki.org/emacs/CustomThemes introduce some theme
+knowledge.
+
+Emacsthemes(https://emacsthemes.com/) and
+Emacs Theme Gallary(https://pawelbx.github.io/emacs-theme-gallery/) lists
+typical emacs theme.
+
+Theme will gradually increase as time goes, put all liked theme package here
+and select zenburn as default.
+
+#+BEGIN_SRC emacs-lisp
+  (use-package zenburn-theme)
+  (use-package monokai-theme)
+  (use-package solarized-theme)
+
+  ;; my favorite theme
+  (load-theme 'zenburn t)
+#+END_SRC
+
+* Footer
+Refer to [[#header][header]] for more details.
+
+#+BEGIN_SRC emacs-lisp
+  ;; calculate finish seconds and print
+  (when (boundp 'y/time-begin-seconds)
+    (defconst y/time-finish-seconds (float-time))
+    (message "y/time-elapsed-time is %.3f seconds (file: %s and %s)"
+             (- y/time-finish-seconds y/time-begin-seconds)
+             user-init-file user-init-config)
+    (unintern 'y/time-finish-seconds nil)
+    (unintern 'y/time-begin-seconds nil))
+
+  ;;; footer timestamp message
+  (message "%s" (format-time-string "config.el finish %Y-%m-%d %H:%M:%S"
+                                    (current-time)))
+
+  ;;; config.el ends here
+#+END_SRC
+

@@ -1,0 +1,5 @@
+# Only include el and org in any directory.
+**/*
+!lisp/
+!**/*.org
+!**/*.el
