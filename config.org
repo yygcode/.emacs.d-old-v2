@@ -359,6 +359,15 @@ See =C-h i (elisp) Defining Minor Modes= for details.
   (add-hook 'after-init-hook #'y/line-numbers-mode)
 #+END_SRC
 
+** coding system
+#+BEGIN_SRC emacs-lisp
+  (prefer-coding-system 'utf-8-unix)
+  (when (string-equal current-language-environment "Chinese-GBK")
+    ;; Do not use utf-8-unix . chinese-gbk-dos for
+    ;; the set will cause ggtags failure
+    (setq default-process-coding-system '(utf-8 . chinese-gbk)))
+#+END_SRC
+
 ** ui
 Config for emacs daemon and non-daemon.
 #+BEGIN_SRC emacs-lisp
@@ -536,12 +545,141 @@ Material:
   (diminish 'eldoc-mode)
 #+END_SRC
 
-** hungry delete - performance for all mode
+** expand-region
+- melpa: https://melpa.org/#/expand-region
+- github: https://github.com/magnars/expand-region.el
+#+BEGIN_SRC emacs-lisp
+  (use-package expand-region
+    :init
+    (setq expand-region-smart-cursor t) ;; cursor put to region tail
+    :bind
+    ("<f7>"   . er/expand-region)
+    ("C-c r +"   . er/expand-region)
+    ("C-c r ="   . er/expand-region)
+    ("C-c r w"   . er/mark-word)
+    ("C-c r s"   . er/mark-symbol)
+    ("C-c r f"   . er/mark-method-call)
+    ("C-c r q i" . er/mark-inside-quotes)
+    ("C-c r q o" . er/mark-outside-quotes)
+    ("C-c r p i" . er/mark-inside-pairs)
+    ("C-c r p o" . er/mark-outside-pairs)
+    ("C-c r t i" . er/mark-inner-tag)
+    ("C-c r t o" . er/mark-outer-tag))
+#+END_SRC
+
+** flycheck
+Flycheck is a modern on-the-fly syntax checking package. Homepage is
+https://www.flycheck.org/en/latest/.
+
+Flycheck use external specific system tool to check syntax. See
+https://www.flycheck.org/en/latest/languages.html#flycheck-languages,
+so need properly exec-path to search it. Install package exec-path-from-shell
+for mac compatiblity: https://github.com/purcell/exec-path-from-shell.
+
+#+BEGIN_SRC emacs-lisp
+  (use-package flycheck
+    :diminish
+    :init
+    (setq flycheck-emacs-lisp-load-path 'inherit)
+    :config
+    (add-to-list 'flycheck-clang-warnings "no-pragma-once-outside-header")
+    :hook
+    (after-init    . global-flycheck-mode)
+    (flycheck-mode . (lambda()
+                       "flycheck disable clang then use gcc."
+                       (add-to-list 'flycheck-disabled-checkers
+                                    'c/c++-clang))))
+#+END_SRC
+
+Read https://www.flycheck.org/en/latest/languages.html#emacs-lisp to get more
+details.
+
+Install flycheck-color-mode to enhance display.
+Github https://github.com/flycheck/flycheck-color-mode-line.
+
+#+BEGIN_SRC emacs-lisp
+  (use-package flycheck-color-mode-line
+    :hook
+    (flycheck-mode . flycheck-color-mode-line-mode))
+#+END_SRC
+
+** helpful
+*Helpful* is an alternative to the built-in Emacs help that provides much more
+contextual information.
+
+#+BEGIN_SRC emacs-lisp
+  (use-package helpful
+    :bind
+    ("C-h f" . helpful-callable)
+    ("C-h k" . helpful-key)
+    ("C-h v" . helpful-variable)
+    ("C-h C" . helpful-command)
+    ("C-c C-d" . helpful-at-point))
+#+END_SRC
+
+** highlight parenthesis
+- Github: https://github.com/tsdh/highlight-parentheses.el
+#+BEGIN_SRC emacs-lisp
+  (use-package highlight-parentheses
+    :diminish highlight-parentheses-mode
+    :hook
+    (prog-mode . highlight-parentheses-mode))
+#+END_SRC
+
+** highlight-symbol
+- Github: https://github.com/nschum/highlight-symbol.el
+
+#+BEGIN_SRC emacs-lisp
+  ;; Close highlight-symbol-mode, do it manually
+  (use-package highlight-symbol
+    :diminish highlight-symbol-mode
+    :init
+    :config
+    ;; (setq highlight-symbol-idle-delay .1)
+    ;; The original func always print ugly string '<N> occurrences in buffer'
+    ;; Replace with dummy empty function
+    ;; (setq highlight-symbol-occurrence-message nil)
+    ;; (advice-add 'highlight-symbol-count :override #'(lambda() nil))
+    :bind
+    (([f8] . highlight-symbol-at-point)
+     ([S-f8] . highlight-regexp)
+     ([f9] . highlight-symbol-query-replace)
+     ("C-c s h" . highlight-symbol-at-point)
+     ("C-c s r" . highlight-regexp)
+     ("C-c s R" . highlight-symbol-query-replace))
+    ;; :hook
+    ;; disable auto high-light
+    ;; (prog-mode . highlight-symbol-mode)
+    )
+#+END_SRC
+
+** hungry delete
 #+BEGIN_SRC emacs-lisp
   (use-package hungry-delete
     :diminish
     :hook
     (after-init . global-hungry-delete-mode))
+#+END_SRC
+
+** iedit
+- Homepage: [[https://github.com/victorhge/iedit][Github Iedit]]
+#+BEGIN_SRC emacs-lisp
+  (use-package iedit
+    :bind
+    (("C-c ;" . iedit-mode)))
+#+END_SRC
+
+** info
+- Info colors: https://github.com/ubolonton/info-colors
+#+BEGIN_SRC emacs-lisp
+  (use-package info
+    :bind
+    ("C-h C-a" . info-apropos))
+
+  (use-package info-colors
+    :after info
+    :hook
+    (Info-selection . info-colors-fontify-node))
 #+END_SRC
 
 ** smartparens
@@ -575,6 +713,35 @@ Smartparens is a minor mode for dealing with pairs in Emacs.
     (after-init     . smartparens-global-mode)
     (after-init     . show-smartparens-global-mode)
     (c-mode-common  . turn-on-smartparens-strict-mode))
+#+END_SRC
+
+** stickfunc
+- HomePage: [[https://github.com/tuhdo/semantic-stickyfunc-enhance#features][GitHub StickFunc Enhance]]
+#+BEGIN_SRC emacs-lisp
+  (use-package stickyfunc-enhance
+    :pin melpa
+    :diminish)
+#+END_SRC
+
+** undo tree
+#+BEGIN_SRC emacs-lisp
+  (use-package undo-tree
+    :pin gnu
+    :diminish
+    :hook
+    (after-init . global-undo-tree-mode))
+#+END_SRC
+
+* Dictionary
+** youdao
+- Homepage: [[https://github.com/xuchunyang/youdao-dictionary.el][GitHub Youdao]]
+#+BEGIN_SRC emacs-lisp
+  (use-package youdao-dictionary
+    :init
+    (setq url-automatic-caching t)
+    :bind
+    (("C-c y t" . youdao-dictionary-search-at-point)
+     ("C-c y s" . youdao-dictionary-play-voice-at-point)))
 #+END_SRC
 
 * Footer
