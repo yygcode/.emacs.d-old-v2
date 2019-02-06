@@ -387,9 +387,10 @@ Config for emacs daemon and non-daemon.
       ;; cursor: bar with width 3, OrangeRed color, Steady mode
       (if (display-graphic-p)
           (progn
-            (setq-default cursor-type '(bar . 3))
+            (setq-default cursor-type 'box)
+            (setq-default cursor-in-non-selected-windows nil)
             (blink-cursor-mode -1)
-            (set-cursor-color "OrangeRed"))
+            (set-cursor-color "DarkOrange1"))
         (progn
           ;; Only support xterm.
           ;; FIXME: restore after exit.
@@ -515,6 +516,18 @@ and select zenburn as default.
   ;; map super to meta
   (setq mac-command-modifier 'meta)
 #+END_SRC
+
+** Linux
+Optimize fcitx behavior.
+#+BEGIN_SRC emacs-lisp
+  (use-package fcitx
+    :init
+    (fcitx-aggressive-setup)
+    (fcitx-prefix-keys-turn-on)
+    (fcitx-prefix-keys-add "C-x" "C-c" "C-h" "M-s" "M-o")
+    (setq fcitx-use-dbus t))
+#+END_SRC
+
 
 * Efficiency
 ** company -complete anything
@@ -662,7 +675,8 @@ contextual information.
 #+END_SRC
 
 ** iedit
-- Homepage: [[https://github.com/victorhge/iedit][Github Iedit]]
+- Github: https://github.com/victorhge/iedit
+
 #+BEGIN_SRC emacs-lisp
   (use-package iedit
     :bind
@@ -716,7 +730,8 @@ Smartparens is a minor mode for dealing with pairs in Emacs.
 #+END_SRC
 
 ** stickfunc
-- HomePage: [[https://github.com/tuhdo/semantic-stickyfunc-enhance#features][GitHub StickFunc Enhance]]
+- Github: https://github.com/tuhdo/semantic-stickyfunc-enhance#features
+
 #+BEGIN_SRC emacs-lisp
   (use-package stickyfunc-enhance
     :pin melpa
@@ -724,6 +739,8 @@ Smartparens is a minor mode for dealing with pairs in Emacs.
 #+END_SRC
 
 ** undo tree
+- Github: https://github.com/apchamberlain/undo-tree.el
+
 #+BEGIN_SRC emacs-lisp
   (use-package undo-tree
     :pin gnu
