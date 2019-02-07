@@ -3,7 +3,7 @@
 #+EMAIL: yygcode@gmail.com
 #+DATE: 2017-12-20
 
-* Header
+·* Header
   :PROPERTIES:
   :CUSTOM_ID: header
   :END:
@@ -316,6 +316,8 @@ See =C-h i (elisp) Defining Minor Modes= for details.
   (setq-default make-backup-files nil)
   (setq-default indent-tabs-mode nil)
 
+  (setq byte-compile-warnings '(not free-vars))
+
   (setq kill-ring-max 500
         kill-whole-line t)
   (setq confirm-kill-processes nil)
@@ -423,15 +425,20 @@ Config for emacs daemon and non-daemon.
         display-time-mode t)
   (display-time)
 
+  (setq battery-mode-line-format " [%L %b%p%% %t]" ;; sml will override it
+        battery-update-interval 5)
+  (display-battery-mode)
+
   (use-package smart-mode-line
     :init
     (setq sml/col-number-format "%02c"
+          sml/battery-format " [%L %b%p%% %t]"
           sml/name-width 15
           sml/no-confirm-load-theme t
-          sml/theme 'dark) ;; others: light, respectful
+          ;; sml/theme 'dark ;; others: light, respectful
+          sml/theme 'respectful)
     (sml/setup)
-    (add-to-list 'sml/replacer-regexp-list '(".*/archive" ":AR:"))
-    (add-to-list 'sml/replacer-regexp-list '(".**/archiveserver" ":AS:")))
+    (add-to-list 'sml/replacer-regexp-list '(".*/linux" ":LK:")))
 
   (use-package diminish
     :init
@@ -485,7 +492,7 @@ and select zenburn as default.
 #+END_SRC
 
 ** Mac
-#+BEGIN_SRC emacs-lisp
+#+BEGIN_SRC emacs-lispp
   (when (memq window-system '(mac ns x))
     (use-package exec-path-from-shell
       :quelpa (exec-path-from-shell :fetcher github
@@ -527,7 +534,6 @@ Optimize fcitx behavior.
     (fcitx-prefix-keys-add "C-x" "C-c" "C-h" "M-s" "M-o")
     (setq fcitx-use-dbus t))
 #+END_SRC
-
 
 * Efficiency
 ** company -complete anything
@@ -614,6 +620,26 @@ Github https://github.com/flycheck/flycheck-color-mode-line.
   (use-package flycheck-color-mode-line
     :hook
     (flycheck-mode . flycheck-color-mode-line-mode))
+#+END_SRC
+
+** helm
+*Helm* is an Emacs framework for incremental completions and narrowing
+selections.
+
+- Github: https://github.com/emacs-helm/helm
+- WIKI: https://github.com/emacs-helm/helm/wiki
+
+#+BEGIN_SRC emacs-lisp
+  (use-package helm
+    :diminish
+    :config
+    ;; always use english input in helm minibuffer
+    ;; use C-\ (toggle-input-method) to toggle to other(e.g. pyim)
+    (helm-set-local-variable 'current-input-method nil)
+    :bind
+    ;; ("C-x C-f" . helm-find-files)
+    ("M-x" . helm-M-x)
+    ("C-x b" . helm-mini))
 #+END_SRC
 
 ** helpful
@@ -736,6 +762,52 @@ Smartparens is a minor mode for dealing with pairs in Emacs.
   (use-package stickyfunc-enhance
     :pin melpa
     :diminish)
+#+END_SRC
+
+** swiper
+*Swiper* is a flexible, simple tools for minibuffer completion in Emacs.
+- Github: https://github.com/abo-abo/swiper
+- Manual: http://oremacs.com/swiper/
+- WIKI: https://github.com/abo-abo/swiper/wiki
+
+#+BEGIN_SRC emacs-lisp
+  ;; short bindings with a common prefix
+  ;; https://github.com/abo-abo/hydra
+  (use-package hydra
+    :demand t) ;; used by ivy
+  (use-package ivy
+    ;; archive version ivy-0.10 lost counsel.el, use github replaced
+    :quelpa (ivy :fetcher github
+                 :repo "abo-abo/swiper"
+                 :stable nil)
+    :diminish
+    :after hydra ;; swiper internal use, compile error if absent
+    :init
+    (setq ivy-use-virtual-buffers t)
+    (setq ivy-count-format "%d/%d > "
+          counsel-describe-function-function #'helpful-function
+          counsel-describe-variable #'helpful-variable)
+    (setq counsel-find-file-ignore-regexp
+          (concat
+           ;; filename begins with #
+           "\\(?:\\`[#.]\\)"
+           ;; filename ends with # or ~
+           "\\|\\(?:\\`.+?[#~]\\'\\)"
+           ))
+    :bind
+    ("C-s"     . swiper)
+    ("C-x C-f" . counsel-find-file)
+    ("C-h f"   . counsel-describe-function)
+    ("C-h v"   . counsel-describe-variable)
+    ("C-c g f" . counsel-git)
+    ("C-c g g" . counsel-git-grep)
+    ("C-c g l" . counsel-git-log)
+    ("C-c g a" . counsel-ag)
+    ("C-c g g" . counsel-grep)
+    :hook
+    (after-init . ivy-mode)
+    ;; disable y/basic-keybind for M-n/M-p for next or previous element
+    (minibuffer-setup . (lambda()(y/basic-keybind-mode -1))))
 #+END_SRC
 
 ** undo tree
