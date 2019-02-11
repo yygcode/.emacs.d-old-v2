@@ -95,16 +95,20 @@ analyze config.org time proportion.
           (expand-file-name (concat (file-name-base user-init-config) ".el")
                             user-emacs-directory)))
 
+  (defun y/esup-advice-before(&optional init-file)
+    "Set env EMACS_Y_INTERNAL_ESUP_PROFILER."
+    (setenv "EMACS_Y_INTERNAL_ESUP_PROFILER" "y/esup"))
+
+  (defun y/esup-advice-after(&optional init-file)
+    "Clear env EMACS_Y_INTERNAL_ESUP_PROFILER."
+    (setenv "EMACS_Y_INTERNAL_ESUP_PROFILER" nil)
+    t)
   ;; set env before esup, and clear env after esup
   ;; because we esup config.el but we need load init.el too.
-  (advice-add 'esup :before
-              #'(lambda(&optional init-file)
-                  "y/esup: set env EMACS_Y_INTERNAL_ESUP_PROFILER."
-                  (setenv "EMACS_Y_INTERNAL_ESUP_PROFILER" "y/esup")))
-  (advice-add 'esup :after
-              #'(lambda(&optional init-file)
-                  "y/esup: clear env EMACS_Y_INTERNAL_ESUP_PROFILER."
-                  (setenv "EMACS_Y_INTERNAL_ESUP_PROFILER" nil)))
+  ;;          (add-function :override completing-read-function
+  ;;                        #'helm--completing-read-default)
+  (advice-add 'esup :before #'y/esup-advice-before)
+  (advice-add 'esup :after #'y/esup-advice-after)
 
   (defalias 'y/profile-esup 'esup
     "Profiling emacs startup time.")
@@ -371,7 +375,8 @@ See =C-h i (elisp) Defining Minor Modes= for details.
   (setq default-directory "~/")
 
   ;; Restore very slow in Windows, disable it
-  (when (not (string= system-type "winows-nt"))
+  (unless (or (string= system-type "winows-nt")
+              (getenv "EMACS_Y_INTERNAL_ESUP_PROFILER"))
     (setq desktop-path `(,user-emacs-directory)
           desktop-dirname user-emacs-directory
           desktop-load-locked-desktop nil ;; Do not load if locked
@@ -707,6 +712,7 @@ contextual information.
 
 #+BEGIN_SRC emacs-lisp
   (use-package helpful
+    :pin melpa
     :bind
     ("C-h f" . helpful-callable)
     ("C-h k" . helpful-key)
