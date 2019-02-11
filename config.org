@@ -485,7 +485,8 @@ Config for emacs daemon and non-daemon.
 
   (use-package diminish
     :init
-    (diminish 'y/basic-keybind-mode))
+    (diminish 'y/basic-keybind-mode)
+    (diminish 'y/read-only-keybind-mode))
 #+END_SRC
 
 ** mouse
@@ -591,6 +592,7 @@ Abbreviations expands package. Builtin.
   (setq abbrev-file-name (locate-user-emacs-file ".abbrev.data"))
   (setq-default abbrev-mode t)
   (setq save-abbrevs 'silently)
+  (diminish 'abbrev-mode)
 #+END_SRC
 
 ** company
