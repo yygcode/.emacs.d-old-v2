@@ -3,7 +3,7 @@
 #+EMAIL: yygcode@gmail.com
 #+DATE: 2017-12-20
 
-·* Header
+* Header
   :PROPERTIES:
   :CUSTOM_ID: header
   :END:
@@ -133,6 +133,20 @@ analyze config.org time proportion.
     "Profiling emacs startup time. Show result as a tree.")
 #+END_SRC
 
+* Useful Routines
+- Global useful routines;
+- Misc routines;
+
+#+BEGIN_SRC emacs-lisp
+  (defun y/add-after-init-hook(func)
+    "Add FUNC to after-init or frame-create hook."
+    (if (daemonp)
+        (add-hook 'after-make-frame-functions func)
+      (add-hook 'after-init-hook func)))
+
+  ;; require if exists
+  (require 'y-misc nil t)
+#+END_SRC
 * Keybinds
 ** principle
 - compat both in terminal and X windows
@@ -260,6 +274,18 @@ See =C-h i (elisp) Defining Minor Modes= for details.
     (interactive "p")
     (y/delete-word (- arg)))
 
+  (defun y/open-file-english-words()
+    (interactive)
+    (find-file "~/org/h/english-words.org")
+    (goto-char (point-max)))
+
+  (defun y/kill-help()
+    "Change to other window then quit-window."
+    (interactive)
+    (save-excursion
+      (and (switch-to-buffer "*Help*")
+           (kill-buffer))))
+
   ;; remove arrow key. comment follow three lines if you need arrow key
   ;; e.g.: <up>, <down>, <left>, <right>
   (mapc 'global-unset-key '([left] [right] [up] [down]))
@@ -269,6 +295,9 @@ See =C-h i (elisp) Defining Minor Modes= for details.
   (global-set-key (kbd "RET") #'newline-and-indent)
   (global-set-key (kbd "M-d") #'y/delete-word)
   (global-set-key (kbd "M-<backspace>") #'y/backward-delete-word)
+  (global-set-key (kbd "M-<DEL>") #'y/backward-delete-word)
+  (define-key global-map (kbd "M-p") #'backward-sentence)
+  (define-key global-map (kbd "M-n") #'forward-sentence)
 
   (define-key minibuffer-local-map (kbd "C-p") #'previous-line-or-history-element)
   (define-key minibuffer-local-map (kbd "C-n") #'next-line-or-history-element)
@@ -278,14 +307,13 @@ See =C-h i (elisp) Defining Minor Modes= for details.
     :init-value t
     :keymap
     (let ((map (make-sparse-keymap)))
+      (define-key map (kbd "C-c C-c") #'y/comment-or-uncomment-region-or-line)
       (define-key map (kbd "C-c q s") #'y/switch-buffer-scratch)
       (define-key map (kbd "C-c q i") #'y/switch-buffer-init)
       (define-key map (kbd "C-c q c") #'y/switch-buffer-config)
       (define-key map (kbd "C-c q e") #'y/open-file-english-words)
       (define-key map (kbd "C-h q") #'y/kill-help)
       (define-key map (kbd "C-o") #'other-window)
-      (define-key map (kbd "M-p") #'backward-sentence)
-      (define-key map (kbd "M-n") #'forward-sentence)
       (define-key map (kbd "C-x C-p") #'previous-buffer)
       (define-key map (kbd "C-x C-n") #'next-buffer)
       map))
@@ -299,15 +327,31 @@ See =C-h i (elisp) Defining Minor Modes= for details.
     y/basic-keybind-mode y/basic-keybind-mode-on)
 
   (y/basic-keybind-global-mode 1)
-#+END_SRC
 
+  (define-minor-mode y/read-only-keybind-mode "Read-only minor keybind"
+    :lighter " y-read-only-keybind"
+    :init-value nil
+    :global nil
+    :keymap
+    (let ((map (make-sparse-keymap)))
+      (define-key map (kbd "n") #'next-line)
+      (define-key map (kbd "p") #'previous-line)
+      (define-key map (kbd "a") #'move-beginning-of-line)
+      (define-key map (kbd "e") #'move-end-of-line)
+      (define-key map (kbd "f") #'forward-char)
+      (define-key map (kbd "b") #'backward-char)
+      map))
+
+  (add-hook 'read-only-mode-hook #'y/read-only-keybind-mode)
+#+END_SRC
 * Basic Config
 ** behavior
 #+BEGIN_SRC emacs-lisp
   ;; command history.
   (savehist-mode 1)
   ;; auto revert if buffer not modified. In git repo we always need it.
-  (global-auto-revert-mode 1)
+  (setq global-auto-revert-non-file-buffers t)
+  (global-auto-revert-mode t)
 
   ;; simplify prompt
   (defalias 'yes-or-no-p 'y-or-n-p)
@@ -346,11 +390,12 @@ See =C-h i (elisp) Defining Minor Modes= for details.
 
   (defun y/line-numbers-mode(&optional arg)
     "Line numbers config."
+    (interactive)
     (require 'display-line-numbers)
     (setq display-line-numbers-grow-only t)
     (set-face-attribute 'line-number nil
                         :inherit 'linum
-                        :height 100
+                        :height 110
                         :weight 'normal
                         :slant 'italic)
     (set-face-attribute 'line-number-current-line nil
@@ -358,7 +403,8 @@ See =C-h i (elisp) Defining Minor Modes= for details.
                         :foreground "#FF7F00"
                         :background "#1A1A1A")
     (global-display-line-numbers-mode arg))
-  (add-hook 'after-init-hook #'y/line-numbers-mode)
+  (y/line-numbers-mode) ;; support dynamically reload init file
+  (y/add-after-init-hook #'y/line-numbers-mode)
 #+END_SRC
 
 ** coding system
@@ -408,11 +454,7 @@ Config for emacs daemon and non-daemon.
       (column-number-mode)
       (size-indication-mode t)))
 
-  ;; daemon hook, exec after emacsclient created
-  (add-hook 'after-make-frame-functions #'y/frame-init-ui-basic)
-  ;; non-daemon
-  (unless (daemonp)
-    (add-hook 'after-init-hook 'y/frame-init-ui-basic))
+  (y/add-after-init-hook #'y/frame-init-ui-basic)
 #+END_SRC
 
 ** modeline
@@ -423,6 +465,7 @@ Config for emacs daemon and non-daemon.
   (setq display-time-default-load-average nil
         display-time-format "%k:%M %a" ;; remove %b %d
         display-time-mode t)
+  (setq system-time-locale "C") ;; show english even LANG to zh_CN.UTF-8
   (display-time)
 
   (setq battery-mode-line-format " [%L %b%p%% %t]" ;; sml will override it
@@ -536,21 +579,35 @@ Optimize fcitx behavior.
 #+END_SRC
 
 * Efficiency
-** company -complete anything
-company is a text completion framework. It means COMplete ANYthing.
+** abbrev
+Abbreviations expands package. Builtin.
+
+- Manual: https://www.gnu.org/software/emacs/manual/html_node/emacs/Abbrevs.html#Abbrevs
+- Wiki: https://www.emacswiki.org/emacs/AbbrevMode
+- Ergo: http://ergoemacs.org/emacs/emacs_abbrev_mode_tutorial.html
+
+#+BEGIN_SRC emacs-lisp
+  (require 'abbrev)
+  (setq abbrev-file-name (locate-user-emacs-file ".abbrev.data"))
+  (setq-default abbrev-mode t)
+  (setq save-abbrevs 'silently)
+#+END_SRC
+
+** company
+*company* is a text completion framework. It means COMplete ANYthing.
 Gitub https://github.com/company-mode/company-mode.
 
 The company configuration varies greatly for different major modes, and when
 use emacs, company config will always be adjusted or optimized. So the total
 configurations are complex and huge. If still use orgmode babel to maintain
 company config, the config will be scattered everywhere. Therefore, I put all
-company config in a special file y-init-company.el to enhance maintenance.
+company config in a special file y-company.el to enhance maintenance.
 
 Material:
 - Manual: https://company-mode.github.io/
 
 #+BEGIN_SRC emacs-lisp
-  (require 'y-init-company)
+  (require 'y-company)
 #+END_SRC
 
 ** eldoc - minor mode for lisp
@@ -805,9 +862,7 @@ Smartparens is a minor mode for dealing with pairs in Emacs.
     ("C-c g a" . counsel-ag)
     ("C-c g g" . counsel-grep)
     :hook
-    (after-init . ivy-mode)
-    ;; disable y/basic-keybind for M-n/M-p for next or previous element
-    (minibuffer-setup . (lambda()(y/basic-keybind-mode -1))))
+    (after-init . ivy-mode))
 #+END_SRC
 
 ** undo tree
@@ -821,6 +876,166 @@ Smartparens is a minor mode for dealing with pairs in Emacs.
     (after-init . global-undo-tree-mode))
 #+END_SRC
 
+* Font
+** default config
+elisp Chapter 39 section 39.12 describes more technology about faces. Read it
+for more details:
+- 39.12.9 Font Selection ::
+  https://www.gnu.org/software/emacs/manual/html_node/elisp/Font-Selection.html#Font-Selection
+- 39.12.11 Fontsets ::
+  https://www.gnu.org/software/emacs/manual/html_node/elisp/Fontsets.html#Fontsets
+- 39.12.12 Low-Level Font Representation ::
+  https://www.gnu.org/software/emacs/manual/html_node/elisp/Low_002dLevel-Font.html#Low_002dLevel-Font
+
+Font depends on specific platform (Linux/Mac/Windows). Here according to
+different platform to set beautiful/properly font as much as possible.
+
+- Monospace: Code always use monospace font. See wiki ::
+  https://en.wikipedia.org/wiki/List_of_monospaced_typefaces
+
+Set different font for different major mode. See
+https://emacs.stackexchange.com/a/3044.
+
+#+BEGIN_SRC emacs-lisp
+  (defconst y/font-mono-size-x 15
+    "Monospace font size under graphic.")
+
+  (defconst y/font-mono-size-c 15
+    "Monospace font size under console.")
+
+  ;; FIXME: support for different frame by make-variable-frame-local
+  (defvar y/font-cjk-name nil "Fill when set for CJK fonts.")
+  ;; (make-variable-frame-local 'y/font-cjk-name)
+  (defvar cjk-charsets '(kana han symbol cjk-misc bopomofo))
+
+  (defconst y/font-mono-name-list-default
+    `(("Source Code Variable" . ,y/font-mono-size-x)
+      ("Source Code Pro" . ,y/font-mono-size-x)
+      ("PragmataPro" . ,y/font-mono-size-x)
+      ("ProFont" . ,y/font-mono-size-x)
+      ("Lucida Sans" . ,y/font-mono-size-x)
+      ("Courier New" . ,y/font-mono-size-x)
+      ("Consolas" . ,y/font-mono-size-x)
+      ("DejaVu Sans Mono" . ,y/font-mono-size-x)
+      ("FreeMono" . ,y/font-mono-size-x)
+      ("Liberation Mono" . ,y/font-mono-size-x))
+    "Monospace font name assoc default value.")
+
+  (defconst y/font-monocjk-size-x 15
+    "MonospaceCJK font size under graphic.")
+
+  (defconst y/font-monocjk-size-c 15
+    "MonospaceCJK font size under console.")
+
+  (defconst y/font-monocjk-name-list-default
+    `(("YouYuan"             . ,y/font-monocjk-size-x)
+      ("Microsoft YaHei UI"  . ,y/font-monocjk-size-x)
+      ("Microsoft YaHei"     . ,y/font-monocjk-size-x)
+      ("FangSong"            . ,y/font-monocjk-size-x)
+      ("SimSun"              . ,y/font-monocjk-size-x)
+      ("AR PL SungtiL GB"    . ,y/font-monocjk-size-x)
+      ("AR PL Mingti2L Big5" . ,y/font-monocjk-size-x))
+    "MonospaceCJK font name assoc default value.")
+
+  (defvar y/font-mono-name-list-x nil
+    "Monospace font candidates under graphic. Format is ((name . size) ...).")
+  (defvar y/font-mono-name-list-c nil
+    "Monospace font candidates under console. Format is ((name . size) ...).")
+
+  (defvar y/font-monocjk-name-list-x nil
+    "MonospaceCJK font candidates under graphic. Format is ((name . size) ...).")
+  (defvar y/font-monocjk-name-list-c nil
+    "MonospaceCJK font candidates under console. Format is ((name . size) ...).")
+
+  ;; Customize the name list to satisfy your taste.
+  (cond ((string= system-type "gnu/linux")  ;; Linux
+         (setq y/font-mono-name-list-x y/font-mono-name-list-default
+               y/font-mono-name-list-c y/font-mono-name-list-default)
+         (setq y/font-monocjk-name-list-x y/font-monocjk-name-list-default
+               y/font-monocjk-name-list-c y/font-monocjk-name-list-default))
+        ((string= system-type "darwin")     ;; Mac prepend ?
+         (setq y/font-mono-name-list-x
+               (cons `("Apple Color Emoji" . ,y/font-mono-size-x)
+                     y/font-mono-name-list-default))
+         (setq y/font-mono-name-list-c y/font-mono-name-list-x)
+         (setq y/font-monocjk-name-list-x y/font-monocjk-name-list-default
+               y/font-monocjk-name-list-c y/font-monocjk-name-list-default))
+        ((string= system-type "windows-nt") ;; Windows
+         (setq y/font-mono-name-list-x y/font-mono-name-list-default
+               y/font-mono-name-list-c y/font-mono-name-list-default)
+         (setq y/font-monocjk-name-list-x y/font-monocjk-name-list-default
+               y/font-monocjk-name-list-c y/font-monocjk-name-list-default))
+        (t
+         (setq y/font-mono-name-list-x y/font-mono-name-list-default
+               y/font-mono-name-list-c y/font-mono-name-list-default)
+         (setq y/font-monocjk-name-list-x y/font-monocjk-name-list-default
+               y/font-monocjk-name-list-c y/font-monocjk-name-list-default)))
+
+  (defun y/font-is-exist(namesize)
+    "Check font exist or not. The font property :name is NAME."
+    (if (and (stringp (car namesize))
+             (integerp (cdr namesize))
+             (find-font (font-spec :name (car namesize)
+                                   :size (cdr namesize))))
+        t
+      nil))
+
+  (defun y/font-set-frame-font-if-exist(frame charset namesize &optional fontset)
+    "For FRAME, Set CHARSET's font to NAMESIZE if that font exists. If FONTSET
+  is non-nil, then call set-fontset-font set default font."
+    (if (y/font-is-exist namesize)
+        (progn
+          ;; (message "Set Font Frame(%s) Charset(%s) to %s" frame charset namesize)
+          (if fontset
+              (set-frame-font (font-spec :name (car namesize)
+                                         :size (cdr namesize)) nil nil)
+            (set-fontset-font nil charset (font-spec :name (car namesize)
+                                                     :size (cdr namesize))
+                              frame))
+          (and (memq charset cjk-charsets)
+               (setq y/font-cjk-name (car namesize)))
+          t)
+      nil))
+
+  (defun y/font-set-frame-try-list(frame charset namesizeassoc &optional fontset)
+    "For FRAME, from front to back in NAMESIZEASSOC, try to set CHARSET's font."
+    (let ((r nil))
+      (dolist (namesize namesizeassoc)
+        (unless r
+          (and (y/font-set-frame-font-if-exist
+                frame charset namesize fontset)
+               (setq r t))))))
+
+  (defun y/font-set-frame-font-by-display
+      (frame charset namesizeassocx namesizeassocc &optional fontset)
+    "For FRAME, from front to back in namesizeassoc, try to set CHARSET's font.
+  If frame run in graphic, use NAMESIZEASSOCX, otherwise use NAMESIZEASSOCC"
+    (if (display-graphic-p)
+        (y/font-set-frame-try-list frame charset namesizeassocx fontset)
+      (y/font-set-frame-try-list frame charset namesizeassocc fontset)))
+
+  (defun y/font-set(&optional frame)
+    "For FRAME set properly font."
+    (or frame (setq frame (selected-frame)))
+    (with-selected-frame frame
+        (y/font-set-frame-font-by-display
+         frame nil y/font-mono-name-list-x y/font-mono-name-list-c t)
+        (dolist (charset cjk-charsets)
+          (y/font-set-frame-font-by-display
+           frame charset y/font-monocjk-name-list-x y/font-monocjk-name-list-c))))
+
+  (y/add-after-init-hook #'y/font-set)
+#+END_SRC
+
+** cnfonts
+#+BEGIN_SRC emacs-lisp
+  (use-package cnfonts
+    :init
+    ;; (cnfonts-enable)
+    ;; (cnfonts-set-spacemacs-fallback-fonts)
+    )
+#+END_SRC
+
 * Dictionary
 ** youdao
 - Homepage: [[https://github.com/xuchunyang/youdao-dictionary.el][GitHub Youdao]]
@@ -831,6 +1046,705 @@ Smartparens is a minor mode for dealing with pairs in Emacs.
     :bind
     (("C-c y t" . youdao-dictionary-search-at-point)
      ("C-c y s" . youdao-dictionary-play-voice-at-point)))
+#+END_SRC
+
+* Orgmode
+** directory layout
+- Homepage: [[http://orgmode.org/]]
+- My org layout:
+#+BEGIN_SRC text
+  org             <-- The root of org
+  ├── notes.org   <-- captures
+  ├── h           <-- Homepage
+  ├── a           <-- work(alibaba)
+  ├── p           <-- personal/private data
+  └── misc        <-- All others
+#+END_SRC
+
+** org
+#+BEGIN_SRC emacs-lisp
+  (use-package org
+    :diminish org
+    :init
+    (progn
+      (setq org-support-shift-select t)
+      (setq org-src-fontify-natively t))
+    :config
+    (progn
+      (setq org-directory "~/org")
+      (setq org-agenda-files (list org-directory
+                                   (concat org-directory "/a")
+                                   (concat org-directory "/p")))
+      (setq org-default-notes-file (concat org-directory "/notes.org"))
+      (setq org-display-custom-times t)
+      (setq org-time-stamp-custom-formats
+            '("<%Y-%m-%d %a>" . "<%Y-%m-%d %a %H:%M>")))
+    :bind
+    ;; global
+    (("C-c c" . org-capture)
+     ("C-c a" . org-agenda))
+    (:map org-mode-map
+          ("C-o" . other-window)
+          ("C-c t" . org-insert-structure-template))
+    :mode
+    ("\\.org\\'" . org-mode))
+
+  ;; disable org-src flycheck
+  (use-package org-src
+    :ensure org-plus-contrib
+    :diminish
+    :hook
+    (org-src-mode . (lambda() (flycheck-mode -1))))
+#+END_SRC
+
+** bullets
+- Homepage: [[https://github.com/sabof/org-bullets][GitHub Org Bullets]]
+- FIXME: Win7 Ultimate CN version can not show heading bullets low than level 3
+#+BEGIN_SRC emacs-lisp
+  (use-package org-bullets
+    :hook
+    (org-mode . org-bullets-mode))
+#+END_SRC
+
+** pomodoro
+- https://github.com/lolownia/org-pomodoro
+#+BEGIN_SRC emacs-lisp
+  (use-package org-pomodoro
+    :pin melpa
+    :init
+    (setq org-pomodoro-length 30
+          org-pomodoro-format "%s"))
+#+END_SRC
+
+** publish
+A big topic, finish later.
+
+* Development
+** c/c++ style
+Use c-guess-no-install and c-guess-view to generate style template.
+Read variable c-offsets-alist for more details.
+
+#+BEGIN_SRC emacs-lisp
+  (defconst y/c-style-basic
+    '((c-tab-always-indent . nil)
+      (c-basic-offset . 4)
+      (c-offsets-alist
+       (block-close . 0)       ; Guessed value
+       (brace-list-close . 0)  ; Guessed value
+       (brace-list-entry . 0)  ; Guessed value
+       (brace-list-intro . +)  ; Guessed value
+       (class-close . 0)       ; Guessed value
+       (defun-block-intro . +) ; Guessed value
+       (defun-close . -)       ; Guessed value
+       (defun-open . -)        ; Guessed value
+       (else-clause . 0)       ; Guessed value
+       (inclass . +)           ; Guessed value
+       (statement . 0)         ; Guessed value
+       (statement-block-intro . +) ; Guessed value
+       (statement-cont . +)    ; Guessed value
+       (substatement . +)      ; Guessed value
+       (topmost-intro . 0)     ; Guessed value
+       (access-label . -)
+       (annotation-top-cont . 0)
+       (annotation-var-cont . +)
+       (arglist-close . c-lineup-close-paren)
+       (arglist-cont c-lineup-gcc-asm-reg 0)
+       (arglist-cont-nonempty . c-lineup-arglist)
+       (arglist-intro . +)
+       (block-open . 0)
+       (brace-entry-open . 0)
+       (brace-list-open . 0)
+       (c . c-lineup-C-comments)
+       (case-label . 0)
+       (catch-clause . 0)
+       (class-open . 0)
+       (comment-intro . c-lineup-comment)
+       (composition-close . 0)
+       (composition-open . 0)
+       (cpp-define-intro c-lineup-cpp-define +)
+       (cpp-macro . -1000)
+       (cpp-macro-cont . +)
+       (do-while-closure . 0)
+       (extern-lang-close . 0)
+       (extern-lang-open . 0)
+       (friend . 0)
+       (func-decl-cont . +)
+       (incomposition . +)
+       (inexpr-class . +)
+       (inexpr-statement . +)
+       (inextern-lang . +)
+       (inher-cont . c-lineup-multi-inher)
+       (inher-intro . +)
+       (inlambda . c-lineup-inexpr-block)
+       (inline-close . 0)
+       (inline-open . 0)
+       (inmodule . +)
+       (innamespace . 0)
+       (knr-argdecl . 0)
+       (knr-argdecl-intro . 0)
+       (label . 0)
+       (lambda-intro-cont . +)
+       (member-init-cont . c-lineup-multi-inher)
+       (member-init-intro . +)
+       (module-close . 0)
+       (module-open . 0)
+       (namespace-close . 0)
+       (namespace-open . 0)
+       (objc-method-args-cont . c-lineup-ObjC-method-args)
+       (objc-method-call-cont c-lineup-ObjC-method-call-colons c-lineup-ObjC-method-call +)
+       (objc-method-intro .
+                          [0])
+       (statement-case-intro . +)
+       (statement-case-open . 0)
+       (stream-op . c-lineup-streamop)
+       (string . -1000)
+       (substatement-label . 0)
+       (substatement-open . 0)
+       (template-args-cont c-lineup-template-args +)
+       (topmost-intro-cont . c-lineup-topmost-intro-cont)))
+    "y/c-basic")
+  (c-add-style "y/c-basic" y/c-style-basic)
+
+  (defconst y/c-style-linux
+    '((c-tab-always-indent . nil) ; manualy added
+      (c-basic-offset . 8)     ; Guessed value
+      (c-offsets-alist
+       (block-close . 0)       ; Guessed value
+       (brace-list-close . 0)  ; Guessed value
+       (brace-list-entry . 0)  ; Guessed value
+       (brace-list-intro . +)  ; Guessed value
+       (class-close . 0)       ; Guessed value
+       (defun-block-intro . +) ; Guessed value
+       (defun-close . -)       ; Guessed value
+       (defun-open . -)        ; Guessed value
+       (else-clause . 0)       ; Guessed value
+       (inclass . +)           ; Guessed value
+       (statement . 0)         ; Guessed value
+       (statement-block-intro . +) ; Guessed value
+       (statement-cont . +)    ; Guessed value
+       (substatement . +)      ; Guessed value
+       (topmost-intro . 0)     ; Guessed value
+       (access-label . -)
+       (annotation-top-cont . 0)
+       (annotation-var-cont . +)
+       (arglist-close . c-lineup-close-paren)
+       (arglist-cont c-lineup-gcc-asm-reg 0)
+       (arglist-cont-nonempty . c-lineup-arglist)
+       (arglist-intro . c-lineup-arglist-intro-after-paren)
+       (block-open . 0)
+       (brace-entry-open . 0)
+       (brace-list-open . 0)
+       (c . c-lineup-C-comments)
+       (case-label . 0)
+       (catch-clause . 0)
+       (class-open . 0)
+       (comment-intro . c-lineup-comment)
+       (composition-close . 0)
+       (composition-open . 0)
+       (cpp-define-intro c-lineup-cpp-define +)
+       (cpp-macro . -1000)
+       (cpp-macro-cont . +)
+       (do-while-closure . 0)
+       (extern-lang-close . 0)
+       (extern-lang-open . 0)
+       (friend . 0)
+       (func-decl-cont . +)
+       (incomposition . +)
+       (inexpr-class . +)
+       (inexpr-statement . +)
+       (inextern-lang . +)
+       (inher-cont . c-lineup-multi-inher)
+       (inher-intro . +)
+       (inlambda . c-lineup-inexpr-block)
+       (inline-close . 0)
+       (inline-open . 0)
+       (inmodule . +)
+       (innamespace . +)
+       (knr-argdecl . 0)
+       (knr-argdecl-intro . 5)
+       (label . 0)
+       (lambda-intro-cont . +)
+       (member-init-cont . c-lineup-multi-inher)
+       (member-init-intro . +)
+       (module-close . 0)
+       (module-open . 0)
+       (namespace-close . 0)
+       (namespace-open . 0)
+       (objc-method-args-cont . c-lineup-ObjC-method-args)
+       (objc-method-call-cont c-lineup-ObjC-method-call-colons c-lineup-ObjC-method-call +)
+       (objc-method-intro . [0])
+       (statement-case-intro . +)
+       (statement-case-open . +)
+       (stream-op . c-lineup-streamop)
+       (string . -1000)
+       (substatement-label . 0)
+       (substatement-open . 0)
+       (template-args-cont c-lineup-template-args +)
+       (topmost-intro-cont first c-lineup-topmost-intro-cont c-lineup-gnu-DEFUN-intro-cont)))
+    "y/c-linux")
+  (c-add-style "y/c-linux" y/c-style-linux)
+
+  (defconst y/c-style-alibaba
+    '((c-tab-always-indent . nil) ; manualy added
+      (c-basic-offset . 4)     ; Guessed value
+      (c-offsets-alist
+       (block-close . 0)       ; Guessed value
+       (brace-list-close . 0)  ; Guessed value
+       (brace-list-entry . 0)  ; Guessed value
+       (brace-list-intro . +)  ; Guessed value
+       (class-close . 0)       ; Guessed value
+       (defun-block-intro . +) ; Guessed value
+       (defun-close . -)       ; Guessed value
+       (defun-open . -)        ; Guessed value
+       (else-clause . 0)       ; Guessed value
+       (inclass . +)           ; Guessed value
+       (statement . 0)         ; Guessed value
+       (statement-block-intro . +) ; Guessed value
+       (statement-cont . +)    ; Guessed value
+       (substatement . +)      ; Guessed value
+       (topmost-intro . 0)     ; Guessed value
+       (access-label . -)
+       (annotation-top-cont . 0)
+       (annotation-var-cont . +)
+       (arglist-close . c-lineup-close-paren)
+       (arglist-cont c-lineup-gcc-asm-reg 0)
+       (arglist-cont-nonempty . c-lineup-arglist)
+       (arglist-intro . +)
+       (block-open . 0)
+       (brace-entry-open . 0)
+       (brace-list-open . 0)
+       (c . c-lineup-C-comments)
+       (case-label . 0)
+       (catch-clause . 0)
+       (class-open . 0)
+       (comment-intro . c-lineup-comment)
+       (composition-close . 0)
+       (composition-open . 0)
+       (cpp-define-intro c-lineup-cpp-define +)
+       (cpp-macro . -1000)
+       (cpp-macro-cont . +)
+       (do-while-closure . 0)
+       (extern-lang-close . 0)
+       (extern-lang-open . 0)
+       (friend . 0)
+       (func-decl-cont . +)
+       (incomposition . +)
+       (inexpr-class . +)
+       (inexpr-statement . +)
+       (inextern-lang . +)
+       (inher-cont . c-lineup-multi-inher)
+       (inher-intro . +)
+       (inlambda . c-lineup-inexpr-block)
+       (inline-close . 0)
+       (inline-open . 0)
+       (inmodule . +)
+       (innamespace . 0)
+       (knr-argdecl . 0)
+       (knr-argdecl-intro . 0)
+       (label . 0)
+       (lambda-intro-cont . +)
+       (member-init-cont . c-lineup-multi-inher)
+       (member-init-intro . +)
+       (module-close . 0)
+       (module-open . 0)
+       (namespace-close . 0)
+       (namespace-open . 0)
+       (objc-method-args-cont . c-lineup-ObjC-method-args)
+       (objc-method-call-cont c-lineup-ObjC-method-call-colons c-lineup-ObjC-method-call +)
+       (objc-method-intro .
+                          [0])
+       (statement-case-intro . +)
+       (statement-case-open . 0)
+       (stream-op . c-lineup-streamop)
+       (string . -1000)
+       (substatement-label . 0)
+       (substatement-open . 0)
+       (template-args-cont c-lineup-template-args +)
+       (topmost-intro-cont . c-lineup-topmost-intro-cont)))
+    "y/c-alibaba")
+  (c-add-style "y/c-alibaba" y/c-style-alibaba)
+
+  (defun y/c-style-hook()
+    "Config c/c++ style depends on file pathname"
+    (when (buffer-file-name)
+      (cond ((or (string-match "/pangu/" (buffer-file-name))
+                 (string-match "/apsara/" (buffer-file-name))
+                 (string-match "/stone/" (buffer-file-name)))
+             (c-set-style "y/c-alibaba"))
+            ((or (string-match "/linux.*/" (buffer-file-name)))
+             (c-set-style "y/c-linux")
+             ;; Linux use real tab. Auto buffer-local.
+             (setq indent-tabs-mode t))
+            (t ;; all default to y/c-basic
+             (c-set-style "y/c-basic")))))
+  (add-hook 'c-mode-common-hook 'y/c-style-hook)
+#+END_SRC
+
+** cmake
+#+BEGIN_SRC emacs-lisp
+  (use-package cmake-mode)
+  (use-package cmake-font-lock
+    :pin melpa)
+#+END_SRC
+
+** company
+   Enhance for c/c++. see =~/.emacs.d/lisp/y-company.el=.
+
+** c++ modern font
+*modern-cpp-font-lock* Syntax highlighting support for "Modern C++" - until
+C++20 and Technical Specification.
+
+- Github: https://github.com/ludwigpacifici/modern-cpp-font-lock
+- Wiki: https://github.com/ludwigpacifici/modern-cpp-font-lock/wiki
+
+#+BEGIN_SRC emacs-lisp
+  (use-package modern-cpp-font-lock
+    :diminish modern-c++-font-lock-mode
+    :hook
+    (c++-mode . modern-c++-font-lock-mode))
+
+  (add-to-list 'auto-mode-alist '("\\.cpp\\'" . c++-mode))
+  (add-to-list 'auto-mode-alist '("\\.hh\\'" . c++-mode))
+  (add-to-list 'auto-mode-alist '("\\.hpp\\'" . c++-mode))
+#+END_SRC
+
+** gtags
+*xref* used to find definitions and references of any function, method,
+struct, macro,. Builtin.
+
+*ggtags* and *counsel-gtags* are global wrapper.
+
+Put all in y-init-tags.el
+
+- Manual: https://www.gnu.org/software/emacs/manual/html_node/emacs/Xref.html#Xref
+- ggtags github: https://github.com/leoliu/ggtags
+- counsel-gtags github: https://github.com/syohex/emacs-counsel-gtags
+
+#+begin_src emacs-lisp
+  (require 'xref)
+  (define-key emacs-lisp-mode-map (kbd "C-c x .") #'xref-find-definitions)
+  (define-key emacs-lisp-mode-map (kbd "C-c x d") #'xref-find-definitions)
+  (define-key emacs-lisp-mode-map (kbd "C-c x r") #'xref-find-references)
+  (define-key lisp-interaction-mode-map (kbd "C-c x .") #'xref-find-definitions)
+  (define-key lisp-interaction-mode-map (kbd "C-c x d") #'xref-find-definitions)
+  (define-key lisp-interaction-mode-map (kbd "C-c x r") #'xref-find-references)
+
+  (use-package ggtags
+    :diminish
+    :bind
+    (:map ggtags-mode-map
+          ("C-c g s" . ggtags-find-other-symbol)
+          ("C-c g ." . ggtags-find-tag-dwim)
+          ("C-c g h" . ggtags-view-tag-history)
+          ("C-c g r" . ggtags-find-reference)
+          ("C-c g f" . ggtags-find-file)
+          ("C-c g C" . ggtags-create-tags)
+          ("C-c g c" . ggtags-completion-at-point)
+          ("C-c g u" . ggtags-update-tags)))
+
+  (use-package counsel-gtags
+    :diminish
+    :bind
+    (:map counsel-gtags-mode-map
+          ("C-c g s" . counsel-gtags-find-symbol)
+          ("C-c g ." . counsel-gtags-dwim)
+          ("C-c g ," . counsel-gtags-pop)
+          ("C-c g d" . counsel-gtags-find-definition)
+          ("C-c g r" . counsel-gtags-find-reference)
+          ("C-c g f" . counsel-gtags-find-file)
+          ("C-c g C" . counsel-gtags-create-tags)
+          ("C-c g u" . counsel-gtags-update-tags))
+    :hook
+    (c-mode-common . counsel-gtags-mode))
+
+  ;; Join gtags-find-symbol and semantic-ia-fast-jump smoothly.
+  (defun y/tags-jump-symbol(pos)
+    "Find tag at current point POS, and use current point if POS nil."
+    (interactive "d")
+    (or pos (setq pos (point)))
+    (or (and (semantic-active-p)
+             (semantic-ia-fast-jump pos))
+        (and (bound-and-true-p counsel-gtags-mode)
+             (counsel-gtags-dwim))
+        (xref-find-definitions (xref-backend-identifier-at-point
+                                (xref-find-backend)))
+        (error "Could not find symbol at current point")))
+
+  (global-set-key (kbd "M-.") #'y/tags-jump-symbol)
+#+end_src
+
+** log view
+Here is an extend template. Company Specialized config dispath to private
+config.
+
+- Github: https://github.com/doublep/logview
+#+BEGIN_SRC emacs-lisp
+  (use-package logview
+    :init
+    (setq logview-additional-submodes
+          '(("ycode-log-submode"
+             (format . "[TIMESTAMP] [LEVEL] [THREAD]")
+             (levels . "ycode-log-level")
+             ;; define timestamp if not one of standard
+             ;; (timestamp . "yyyy-MM-dd HH:mm:ss.UUUUUU")
+             (aliases "ycode-log"))))
+
+    (setq logview-additional-level-mappings
+          '(("ycode-log-level"
+             (error "ERROR" "FATAL")
+             (warning "WARNING")
+             (information "INFO")
+             (debug "DEBUG")
+             (trace "TRACE")))))
+#+END_SRC
+
+** magit
+#+BEGIN_SRC emacs-lisp
+  (use-package magit)
+#+END_SRC
+
+** semantic
+See =~/.emacs.d/lisp/y-company.el=
+
+Semantic use mode-local include path variable. When we work on multiple
+project with different system path, semantic can not work correctly. We
+use =switch-buffer-hook= to change include path dynamically.
+See [[#sec-dir-locals][Security dir-locals]] for detail.
+
+** sr-speedbar
+#+BEGIN_SRC emacs-lisp
+  (use-package sr-speedbar
+    :init
+    (setq sr-speedbar-auto-refresh t
+          speedbar-use-images nil
+          sr-speedbar-width-x 10
+          sr-speedbar-max-width 20
+          sr-speedbar-skip-other-window-p t)
+    :bind
+    ("C-c w b" . sr-speedbar-toggle)
+    ("C-c b" . sr-speedbar-select-window))
+#+END_SRC
+
+#+BEGIN_SRC emacs-lisp
+  (use-package function-args
+    :config
+    (fa-config-default))
+#+END_SRC
+
+** whitespace
+*whitespace* render a space, tabs, newlines to a visible glyph.
+- Github: https://github.com/emacs-mirror/emacs/blob/master/lisp/whitespace.el
+- builtin lisp, see [[https://github.com/emacs-mirror/emacs/blob/master/lisp/whitespace.el][GitHub whitespace.el]]
+- WIKI: https://www.emacswiki.org/emacs/WhiteSpace
+- Ergoemacs: http://ergoemacs.org/emacs/whitespace-mode.html
+#+BEGIN_SRC emacs-lisp
+  (defun y/whitespace-color(&optional theme)
+    "Set whitespace color depends on current theme THEME."
+    (custom-set-faces
+     '(whitespace-newline ((t (:foreground "#75715E" :background nil))))
+     ;; '(whitespace-newline ((t (:foreground "#424242"))))
+     '(whitespace-tab ((t (:foreground "#75715E" :background nil))))
+     '(whitespace-space ((t (:foreground "#75715E" :background nil))))))
+
+  (use-package whitespace
+    :diminish
+    :config
+    (progn
+      (setq whitespace-line-column 80) ;; limit line length
+      (setq whitespace-style
+            '(face trailing spaces tabs lines-tail newline
+                   space-before-tab space-before-tab::tab
+                   space-before-tab::space space-after-tab::tab
+                   space-after-tab::space space-after-tab
+                   newline-mark space-mark tab-mark))
+      (setq whitespace-display-mappings
+            '((space-mark 32 [183] [46])
+              (newline-mark 10 [182 10])
+              ;; (tab-mark 9 [?. 9] [92 9])
+              (tab-mark   ?\t   [?\xBB ?\t] [?\\ ?\t])))
+      (y/whitespace-color))
+    :hook
+    (prog-mode . whitespace-mode)
+    (text-mode . whitespace-mode)
+    (before-save . whitespace-cleanup))
+
+  ;; theme has no hook. use advice.
+#+END_SRC
+
+** yasnippet
+*YASnippet* is a template system for Emacs. It allows you to type an
+abbreviation and automatically expand it into function templates. Bundled
+language templates include: C, C++, C#, Perl, Python, Ruby, SQL, LaTeX,
+HTML, CSS and more.
+
+- Github: https://github.com/joaotavora/yasnippet
+
+#+BEGIN_SRC emacs-lisp
+  (use-package yasnippet
+    :diminish yas-minor-mode
+    :hook
+    (prog-mode . yas-minor-mode))
+
+  (use-package yasnippet-snippets)
+#+END_SRC
+
+* Security
+** dir-locals
+   :PROPERTIES:
+   :CUSTOM_ID: sec-dir-locals
+   :END:
+
+#+begin_src emacs-lisp
+  (require 'cc-mode)
+  (require 'semantic)
+  (require 'semantic/bovine/gcc)
+
+  (setq enable-dir-local-variables t
+        enable-remote-dir-locals t
+        enable-local-variables :safe
+        enable-local-eval t)
+  ;; example: #include "dir1/file1.h"
+  (defvar-local y/project-include-path nil
+    "Project additional include path (double quotation).")
+  ;; example: #include <dir1/file1.h>
+  (defvar-local y/project-system-include-path nil
+    "Project additional system include path (angle bracket).")
+  (defvar-local y/project-tab-visible nil
+    "Project source code show visible TAB or not.")
+  (defvar-local y/project-exclude-system-path nil
+    "Project use builtin system path or not. Set to nil for linux kernel.")
+  (defvar-local y/project-read-only nil
+    "Project set buffer to read only mode.")
+  (put 'y/project-include-path 'safe-local-variable #'listp)
+  (put 'y/project-system-include-path 'safe-local-variable #'listp)
+  (put 'y/project-tab-visible 'safe-local-variable #'booleanp)
+  (put 'y/project-exclude-system-path 'safe-local-variable #'booleanp)
+  (put 'y/project-read-only 'safe-local-variable #'booleanp)
+
+  (defconst y/semantic-c-system-include-path
+    (semantic-gcc-get-include-paths "c")
+    "Default system include path for C.")
+
+  (defconst y/semantic-c++-system-include-path
+    (semantic-gcc-get-include-paths "c++")
+    "Default system include path for C++.")
+
+  ;; Call if new compiler installed
+  (defun y/semantic-refresh-system-include-path()
+    "Refresh system include path. Almost you need not call directly."
+    (interactive)
+    (setq y/semantic-c-system-include-path
+          (semantic-gcc-get-include-paths "c")
+          y/semantic-c++-system-include-path
+          (semantic-gcc-get-include-paths "c++")))
+
+  ;; init default path
+  (y/semantic-refresh-system-include-path)
+
+  (defun y/whitespace-style-tab-visible(&optional tab-visible)
+    "Set whitespace config depends on project config or TAB-VISIBLE."
+    (interactive)
+    (or tab-visible (setq tab-visible y/project-tab-visible))
+    (when (and (or (string= major-mode "c-mode")
+                   (string= major-mode "c++-mode"))
+               tab-visible)
+      (custom-set-faces
+       '(whitespace-tab ((t (:foreground "#75715E" :background orangered4)))))))
+
+  (defun y/project-set-config()
+    "Set project include path.
+  SYSTEM-INCLUDE-PATH-CLEAR nil do nothing, t clear system include path."
+
+    (let ((de '()) ;; directory external include path
+          (ds '()) ;; directory system include path
+          (dl (locate-dominating-file default-directory
+                                      dir-locals-file)))
+
+      ;; reset db root
+      (if dl
+          (setq semanticdb-project-roots `(,dl))
+        (setq semanticdb-project-roots dl))
+
+      ;; process external include path.
+      (dolist (d y/project-include-path)
+        (if (stringp d)
+            (progn
+              (or (string-prefix-p "/" d)
+                  (setq d (concat dl d)))
+              (add-to-list 'de (file-truename d) t))
+          (warn "y/projects: not a string include path:" d)))
+      ;; Alwasys append project root directory to include path
+      (and dl (add-to-list 'de (file-truename dl) t))
+      ;; (setq semantic-c-dependency-system-include-path de)
+
+      ;; process system include path.
+      (dolist (d y/project-system-include-path)
+        (if (stringp d)
+            (progn
+              (or (string-prefix-p "/" d)
+                  (setq d (concat dl d)))
+              (add-to-list 'ds (file-truename d) t))
+          (warn "y/projects: not a string system include path:" d)))
+
+      (setq-mode-local c-mode semantic-dependency-include-path ds)
+      (setq-mode-local c++-mode semantic-dependency-include-path de)
+
+      (unless y/project-exclude-system-path
+           (if (string= major-mode "c-mode")
+               (setq ds (append y/semantic-c-system-include-path ds))
+             (setq ds (append y/semantic-c++-system-include-path ds))))
+      (setq-mode-local c-mode semantic-dependency-system-include-path ds)
+      (setq-mode-local c++-mode semantic-dependency-system-include-path ds)
+
+      (y/whitespace-style-tab-visible)
+      (when y/project-read-only
+        (read-only-mode 1))
+
+      ;; ds now add all ds and de assign to other tools.
+      ;; (setq ds (append ds de))
+      (setq flycheck-clang-include-path de
+            flycheck-clang-includes ds
+            flycheck-gcc-include-path de
+            flycheck-gcc-includes ds
+            company-c-headers-path-system (append de ds))
+      (when (bound-and-true-p flycheck-mode)
+        (flycheck-mode))))
+
+  ;; After all, semantic-c-dependency-include-path and
+  ;; semantic-dependency-include-path not work. Always use system directory
+  ;; So always update system directory when buffer switched.
+  (defun y/project-c-common-switch-buffer-hook(cur-buffer prev-buffer)
+    "Change inlcude path when buffer switched."
+    (when (or (string= major-mode "c-mode")
+              (string= major-mode "c++-mode")
+              t)
+      (y/project-set-config)))
+
+  (use-package switch-buffer-hook
+    :diminish
+    :quelpa (switch-buffer-hook :fetcher github
+                 :repo "yygcode/switch-buffer-hook"
+                 :stable nil)
+    :init
+    (switch-buffer-hook-mode))
+  (add-hook 'switch-buffer-hook #'y/project-c-common-switch-buffer-hook)
+#+end_src
+
+* Project
+** projectile
+#+BEGIN_SRC emacs-lisp
+  (use-package projectile)
+#+END_SRC
+
+* Search Engineer
+** google
+- google this package: [[https://github.com/Malabarba/emacs-google-this][Emacs Google This]]
+#+BEGIN_SRC emacs-lisp
+  (use-package google-this
+    :diminish
+    :bind-keymap ("C-c s g" . google-this-mode-submap)
+    :hook
+    (after-init . google-this-mode))
 #+END_SRC
 
 * Footer
@@ -853,3 +1767,5 @@ Refer to [[#header][header]] for more details.
   ;;; config.el ends here
 #+END_SRC
 
+* Appendix
+Gook Luck, Guys.
