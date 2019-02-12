@@ -346,7 +346,14 @@ See =C-h i (elisp) Defining Minor Modes= for details.
       (define-key map (kbd "b") #'backward-char)
       map))
 
-  (add-hook 'read-only-mode-hook #'y/read-only-keybind-mode)
+  (defun y/read-only-keybind-switch()
+    "Toggle y/read-only-keybind depends on `buffer-read-only' value."
+    (if buffer-read-only
+        (y/read-only-keybind-mode 1)
+      (y/read-only-keybind-mode -1)))
+
+  (add-hook 'read-only-mode-hook #'y/read-only-keybind-switch)
+  (add-hook 'find-file-hook #'y/read-only-keybind-switch)
 #+END_SRC
 * Basic Config
 ** behavior
@@ -1659,9 +1666,8 @@ HTML, CSS and more.
     (when (and (or (string= major-mode "c-mode")
                    (string= major-mode "c++-mode"))
                tab-visible)
-      (custom-set-faces
-       '(whitespace-tab
-         ((t (:foreground "#75715E" :background "orangered4")))))))
+      (face-remap-add-relative
+       'whitespace-tab :foreground "#75715E" :background "orangered4")))
 
   (defun y/project-set-config()
     "Set project include path.
