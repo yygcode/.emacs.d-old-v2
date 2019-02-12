@@ -1479,6 +1479,8 @@ Put all in y-init-tags.el
         (error "Could not find symbol at current point")))
 
   (global-set-key (kbd "M-.") #'y/tags-jump-symbol)
+  (define-key y/read-only-keybind-mode-map "." #'y/tags-jump-symbol)
+  (define-key y/read-only-keybind-mode-map "," #'xref-pop-marker-stack)
 #+end_src
 
 ** log view
