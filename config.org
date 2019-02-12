@@ -576,12 +576,13 @@ and select zenburn as default.
 ** Linux
 Optimize fcitx behavior.
 #+BEGIN_SRC emacs-lisp
-  (use-package fcitx
-    :init
-    (fcitx-aggressive-setup)
-    (fcitx-prefix-keys-turn-on)
-    (fcitx-prefix-keys-add "C-x" "C-c" "C-h" "M-s" "M-o")
-    (setq fcitx-use-dbus t))
+  (when (executable-find "fcitx-remote")
+    (use-package fcitx
+      :init
+      (fcitx-aggressive-setup)
+      (fcitx-prefix-keys-turn-on)
+      (fcitx-prefix-keys-add "C-x" "C-c" "C-h" "M-s" "M-o")
+      (setq fcitx-use-dbus t)))
 #+END_SRC
 
 * Efficiency
@@ -1659,7 +1660,8 @@ HTML, CSS and more.
                    (string= major-mode "c++-mode"))
                tab-visible)
       (custom-set-faces
-       '(whitespace-tab ((t (:foreground "#75715E" :background orangered4)))))))
+       '(whitespace-tab
+         ((t (:foreground "#75715E" :background "orangered4")))))))
 
   (defun y/project-set-config()
     "Set project include path.
