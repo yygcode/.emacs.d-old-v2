@@ -1638,6 +1638,10 @@ HTML, CSS and more.
   (put 'y/project-tab-visible 'safe-local-variable #'booleanp)
   (put 'y/project-exclude-system-path 'safe-local-variable #'booleanp)
   (put 'y/project-read-only 'safe-local-variable #'booleanp)
+  (put 'buffer-read-only 'safe-local-variable #'booleanp)
+
+  (defvar-local y/project--auto-read-only t
+    "Auto Readonly if y/project-read-only is set.")
 
   (defconst y/semantic-c-system-include-path
     (semantic-gcc-get-include-paths "c")
@@ -1715,8 +1719,13 @@ HTML, CSS and more.
       (setq-mode-local c++-mode semantic-dependency-system-include-path ds)
 
       (y/whitespace-style-tab-visible)
-      (when y/project-read-only
-        (read-only-mode 1))
+      (when (and y/project-read-only
+                 y/project--auto-read-only)
+        (progn
+          ;; disable read-only after each switch buffer
+          (setq y/project--auto-read-only nil)
+          (unless buffer-read-only
+            (read-only-mode 1))))
 
       ;; ds now add all ds and de assign to other tools.
       ;; (setq ds (append ds de))
