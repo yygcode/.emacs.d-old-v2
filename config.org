@@ -1695,9 +1695,10 @@ HTML, CSS and more.
                   (setq d (concat dl d)))
               (add-to-list 'de (file-truename d) t))
           (warn "y/projects: not a string include path:" d)))
-      ;; Alwasys append project root directory to include path
-      (and dl (add-to-list 'de (file-truename dl) t))
-      ;; (setq semantic-c-dependency-system-include-path de)
+
+      ;; Always add current buffer directory
+      (when buffer-file-name
+        (add-to-list 'de default-directory))
 
       ;; process system include path.
       (dolist (d y/project-system-include-path)
@@ -1708,7 +1709,7 @@ HTML, CSS and more.
               (add-to-list 'ds (file-truename d) t))
           (warn "y/projects: not a string system include path:" d)))
 
-      (setq-mode-local c-mode semantic-dependency-include-path ds)
+      (setq-mode-local c-mode semantic-dependency-include-path de)
       (setq-mode-local c++-mode semantic-dependency-include-path de)
 
       (unless y/project-exclude-system-path
