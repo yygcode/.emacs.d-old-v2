@@ -380,7 +380,7 @@ See =C-h i (elisp) Defining Minor Modes= for details.
   ;; No backup, use git maintain file version
   (setq-default make-backup-files nil)
   (setq-default indent-tabs-mode nil)
-  (setq-default case-fold-search nil)
+  (setq-default case-fold-search t)
 
   (setq byte-compile-warnings '(not free-vars))
 
@@ -525,7 +525,8 @@ Disable mouse globally.
 ** search
 #+begin_src emacs-lisp
   (require 'isearch)
-  (setq isearch-lax-whitespace t
+  (setq isearch-case-fold-search t
+        isearch-lax-whitespace t
         isearch-regexp-lax-whitespace "\\s-+"
         search-default-mode t
         search-whitespace-regexp ".*")
