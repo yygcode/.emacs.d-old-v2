@@ -295,6 +295,15 @@ See =C-h i (elisp) Defining Minor Modes= for details.
   (mapc 'global-unset-key '([left] [right] [up] [down]))
   (global-unset-key (kbd "C-x <left>"))
   (global-unset-key (kbd "C-x <right>"))
+  (global-unset-key (kbd "C-x C-x")) ;; Reserve as a prefix.
+  (global-set-key (kbd "C-x C-x C-x") #'exchange-point-and-mark)
+
+  ;; See https://www.vt100.net/docs/vt510-rm/chapter8
+  ;; Both VT-<find> and PC-<home> send [CSI 1~], VT-<select> and PC-<end> send
+  ;; [CSI 2~]. Now we always use PC keyboard instead of a VT keyboard, so remap
+  ;; VT-<find> to PC-<home> and VT-<select> to PC-<end>.
+  (global-set-key (kbd "<find>") (kbd "<home>"))
+  (global-set-key (kbd "<select>") (kbd "<end>"))
 
   (global-set-key (kbd "RET") #'newline-and-indent)
   (global-set-key (kbd "M-d") #'y/delete-word)
@@ -363,6 +372,7 @@ See =C-h i (elisp) Defining Minor Modes= for details.
   ;; auto revert if buffer not modified. In git repo we always need it.
   (setq global-auto-revert-non-file-buffers t)
   (global-auto-revert-mode t)
+  (global-hl-line-mode t)
 
   ;; simplify prompt
   (defalias 'yes-or-no-p 'y-or-n-p)
@@ -370,6 +380,7 @@ See =C-h i (elisp) Defining Minor Modes= for details.
   ;; No backup, use git maintain file version
   (setq-default make-backup-files nil)
   (setq-default indent-tabs-mode nil)
+  (setq-default case-fold-search nil)
 
   (setq byte-compile-warnings '(not free-vars))
 
@@ -510,6 +521,19 @@ Disable mouse globally.
     :init
     (global-disable-mouse-mode))
 #+END_SRC
+
+** search
+#+begin_src emacs-lisp
+  (require 'isearch)
+  (setq isearch-lax-whitespace t
+        isearch-regexp-lax-whitespace "\\s-+"
+        search-default-mode t
+        search-whitespace-regexp ".*")
+  (define-key global-map (kbd "C-x C-x C-s")
+    #'isearch-forward-symbol-at-point)
+  (define-key global-map (kbd "C-x C-x s") #'isearch-forward)
+  (define-key global-map (kbd "C-x C-x r") #'isearch-backward)
+#+end_src
 
 * Theme
 Theme is another important ui aspect. Manual
@@ -1486,7 +1510,8 @@ Put all in y-init-tags.el
                                 (xref-find-backend)))
         (error "Could not find symbol at current point")))
 
-  (global-set-key (kbd "M-.") #'y/tags-jump-symbol)
+  (define-key y/basic-keybind-mode-map "M-." #'y/tags-jump-symbol)
+  (define-key y/basic-keybind-mode-map "M-," #'xref-pop-marker-stack)
   (define-key y/read-only-keybind-mode-map "." #'y/tags-jump-symbol)
   (define-key y/read-only-keybind-mode-map "," #'xref-pop-marker-stack)
 #+end_src
