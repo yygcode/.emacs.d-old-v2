@@ -200,12 +200,14 @@ contents dynamically.
     ;; Log all keystroke except self-insert-command
     (setq clm/log-command-exceptions* '(nil self-insert-command)))
 
+  (defvar y/view-lossage--state nil "View lossage state.")
   (defun y/toggle-view-lossage()
     "Toggle auto update view-lossage."
     (interactive)
-    (if (member 'view-lossage pre-command-hook)
-        (remove-hook 'pre-command-hook 'view-lossage)
-      (add-hook 'pre-command-hook 'view-lossage)))
+    (if y/view-lossage--state
+        (remove-hook 'pre-command-hook #'view-lossage)
+      (add-hook 'pre-command-hook #'view-lossage))
+    (setq y/view-lossage--state (not y/view-lossage--state)))
 #+END_SRC
 
 ** keybind help
@@ -353,6 +355,8 @@ See =C-h i (elisp) Defining Minor Modes= for details.
       (define-key map (kbd "e") #'move-end-of-line)
       (define-key map (kbd "f") #'forward-char)
       (define-key map (kbd "b") #'backward-char)
+      (define-key map (kbd "l") #'backward-word)
+      (define-key map (kbd "r") #'forward-word)
       map))
 
   (defun y/read-only-keybind-switch()
@@ -530,10 +534,29 @@ Disable mouse globally.
         isearch-regexp-lax-whitespace "\\s-+"
         search-default-mode t
         search-whitespace-regexp ".*")
+  (define-key isearch-mode-map [remap isearch-delete-char] 'isearch-del-char)
   (define-key global-map (kbd "C-x C-x C-s")
     #'isearch-forward-symbol-at-point)
+  (define-key global-map (kbd "<f2>") #'isearch-forward-symbol-at-point)
+  (define-key global-map (kbd "C-<f2>") #'isearch-forward-symbol-at-point)
+  (define-key isearch-mode-map (kbd "<f2>") #'isearch-repeat-forward)
+  (define-key isearch-mode-map (kbd "C-<f2>") #'isearch-repeat-backward)
   (define-key global-map (kbd "C-x C-x s") #'isearch-forward)
   (define-key global-map (kbd "C-x C-x r") #'isearch-backward)
+#+end_src
+
+** window
+#+begin_src emacs-lisp
+  (defhydra y/window-hydra
+    (global-map "C-x C-x w" :foreign-keys warn)
+    "window hydra"
+    ("=" enlarge-window-horizontally "enlarge-window")
+    ("+" enlarge-window-horizontally "enlarge-window")
+    ("-" shrink-window-horizontally "shrink-window")
+    ("_" shrink-window-horizontally "shrink-window")
+    ("q" nil "quit from hydra")
+    ("C-g"  nil "quit from hydra")
+    ("RET" nil "quit from hydra"))
 #+end_src
 
 * Theme
@@ -669,6 +692,7 @@ Material:
     :init
     (setq expand-region-smart-cursor t) ;; cursor put to region tail
     :bind
+    ("<f6>"   . er/mark-symbol)
     ("<f7>"   . er/expand-region)
     ("C-c r +"   . er/expand-region)
     ("C-c r ="   . er/expand-region)
@@ -1554,6 +1578,67 @@ Semantic use mode-local include path variable. When we work on multiple
 project with different system path, semantic can not work correctly. We
 use =switch-buffer-hook= to change include path dynamically.
 See [[#sec-dir-locals][Security dir-locals]] for detail.
+
+Force to parse all source file in a specific directory:
+#+begin_src emacs-lisp
+  ;; copy from https://stackoverflow.com/a/18938265
+  (defvar c-files-regex ".*\\.\\(c\\|cpp\\|h\\|hpp\\)"
+    "A regular expression to match any c/c++ related files under a directory")
+
+  (defun my-semantic-parse-dir (root regex)
+    "
+     This function is an attempt of mine to force semantic to
+     parse all source files under a root directory. Arguments:
+     -- root: The full path to the root directory
+     -- regex: A regular expression against which to match all files in the directory
+    "
+    (let (
+          ;;make sure that root has a trailing slash and is a dir
+          (root (file-name-as-directory root))
+          (files (directory-files root t ))
+         )
+      ;; remove current dir and parent dir from list
+      (setq files (delete (format "%s." root) files))
+      (setq files (delete (format "%s.." root) files))
+      (while files
+        (setq file (pop files))
+        (if (not(file-accessible-directory-p file))
+            ;;if it's a file that matches the regex we seek
+            (progn (when (string-match-p regex file)
+                 (save-excursion
+                   (semanticdb-file-table-object file))
+             ))
+            ;;else if it's a directory
+            (my-semantic-parse-dir file regex)
+        )
+       )
+    )
+  )
+
+  (defun my-semantic-parse-current-dir (regex)
+    "
+     Parses all files under the current directory matching regex
+    "
+    (my-semantic-parse-dir (file-name-directory(buffer-file-name)) regex)
+  )
+
+  (defun lk-parse-curdir-c ()
+    "
+     Parses all the c/c++ related files under the current directory
+     and inputs their data into semantic
+    "
+    (interactive)
+    (my-semantic-parse-current-dir c-files-regex)
+  )
+
+  (defun lk-parse-dir-c (dir)
+    "Prompts the user for a directory and parses all c/c++ related files
+     under the directory
+    "
+    (interactive (list (read-directory-name "Provide the directory to search in:")))
+    (my-semantic-parse-dir (expand-file-name dir) c-files-regex)
+  )
+#+end_src
 
 ** sr-speedbar
 #+BEGIN_SRC emacs-lisp
