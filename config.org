@@ -1535,8 +1535,8 @@ Put all in y-init-tags.el
                                 (xref-find-backend)))
         (error "Could not find symbol at current point")))
 
-  (define-key y/basic-keybind-mode-map "M-." #'y/tags-jump-symbol)
-  (define-key y/basic-keybind-mode-map "M-," #'xref-pop-marker-stack)
+  (define-key y/basic-keybind-mode-map (kbd "M-.") #'y/tags-jump-symbol)
+  (define-key y/basic-keybind-mode-map (kbd "M-,") #'xref-pop-marker-stack)
   (define-key y/read-only-keybind-mode-map "." #'y/tags-jump-symbol)
   (define-key y/read-only-keybind-mode-map "," #'xref-pop-marker-stack)
 #+end_src
