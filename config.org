@@ -415,7 +415,8 @@ See =C-h i (elisp) Defining Minor Modes= for details.
     ";; To create a file, visit it with C-x C-f and enter text in its buffer.\n\n"
     ";; Happy hacking " (or user-login-name "<yanyg>") " - Emacs loves you!\n\n"))
 
-  (defun y/line-numbers-mode(&optional arg)
+  (defun y/line-numbers--face(&optional theme-unused  no-confirm-unused
+                                        no-enable-unused)
     "Line numbers config."
     (interactive)
     (require 'display-line-numbers)
@@ -428,10 +429,14 @@ See =C-h i (elisp) Defining Minor Modes= for details.
     (set-face-attribute 'line-number-current-line nil
                         :inherit 'line-number
                         :foreground "#FF7F00"
-                        :background "#1A1A1A")
-    (global-display-line-numbers-mode arg))
-  (y/line-numbers-mode) ;; support dynamically reload init file
-  (y/add-after-init-hook #'y/line-numbers-mode)
+                        :background "#1A1A1A"))
+
+  ;; advice after load-theme because theme will reset it
+  (advice-add 'load-theme :after #'y/line-numbers--face)
+  ;; run directly if no load-theme explicitly
+  (y/line-numbers--face)
+
+  (add-hook 'after-change-major-mode-hook #'display-line-numbers-mode)
 #+END_SRC
 
 ** coding system
