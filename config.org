@@ -388,6 +388,14 @@ See =C-h i (elisp) Defining Minor Modes= for details.
 
   (setq byte-compile-warnings '(not free-vars))
 
+  ;; prefer split window vertically
+  (setq split-width-threshold 80)
+
+  ;; nice scrolling
+  (setq scroll-margin 0
+        scroll-conservatively 1000
+        scroll-preserve-screen-position t)
+
   (setq kill-ring-max 500
         kill-whole-line t)
   (setq confirm-kill-processes nil)
@@ -451,6 +459,13 @@ See =C-h i (elisp) Defining Minor Modes= for details.
 ** ui
 Config for emacs daemon and non-daemon.
 #+BEGIN_SRC emacs-lisp
+  ;; A light that follows your cursor around so you don't lose it!
+  ;; https://github.com/Malabarba/beacon
+  (use-package beacon
+    :diminish
+    :hook
+    (after-init . beacon-mode))
+
   (defun y/frame-init-ui-basic(&optional frame)
     "Init FRAME user-interface after created."
     (interactive)
@@ -481,6 +496,12 @@ Config for emacs daemon and non-daemon.
       ;; disable bell
       (setq visible-bell nil)
       (setq ring-bell-function 'ignore)
+
+      (set-face-attribute 'isearch nil
+                          :bold t
+                          :italic t
+                          :foreground "#FF7F00"
+                          :background "#1A1A1A")
 
       ;; show column and size in the mode line
       (column-number-mode)
@@ -776,11 +797,12 @@ contextual information.
   (use-package helpful
     :pin melpa
     :bind
-    ("C-h f" . helpful-callable)
-    ("C-h k" . helpful-key)
-    ("C-h v" . helpful-variable)
-    ("C-h C" . helpful-command)
-    ("C-c C-d" . helpful-at-point))
+    ("C-c h f" . helpful-callable)
+    ("C-c h k" . helpful-key)
+    ("C-c h v" . helpful-variable)
+    ("C-c h c" . helpful-command)
+    ("C-c h s" . helpful-symbol)
+    ("C-c h p" . helpful-at-point))
 #+END_SRC
 
 ** highlight parenthesis
@@ -912,8 +934,8 @@ Smartparens is a minor mode for dealing with pairs in Emacs.
     :init
     (setq ivy-use-virtual-buffers t)
     (setq ivy-count-format "%d/%d > "
-          counsel-describe-function-function #'helpful-function
-          counsel-describe-variable #'helpful-variable)
+          counsel-describe-function-function #'describe-function
+          counsel-describe-variable #'help-variable)
     (setq counsel-find-file-ignore-regexp
           (concat
            ;; filename begins with #
