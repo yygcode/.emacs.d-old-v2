@@ -466,6 +466,10 @@ Config for emacs daemon and non-daemon.
     :hook
     (after-init . beacon-mode))
 
+  (use-package hl-todo
+    :hook
+    (after-init . global-hl-todo-mode))
+
   (defun y/frame-init-ui-basic(&optional frame)
     "Init FRAME user-interface after created."
     (interactive)
@@ -747,10 +751,14 @@ for mac compatiblity: https://github.com/purcell/exec-path-from-shell.
     :diminish
     :init
     (setq flycheck-emacs-lisp-load-path 'inherit)
+    (unless (file-exists-p (expand-file-name ".emacs.disable-flycheck"
+                                             user-emacs-directory))
+      (add-hook 'after-init-hook #'global-flycheck-mode))
     :config
     (add-to-list 'flycheck-clang-warnings "no-pragma-once-outside-header")
     :hook
-    (after-init    . global-flycheck-mode)
+    ;; support disable flag for different platform
+    ;; (after-init    . global-flycheck-mode)
     (flycheck-mode . (lambda()
                        "flycheck disable clang then use gcc."
                        (add-to-list 'flycheck-disabled-checkers
@@ -968,6 +976,14 @@ Smartparens is a minor mode for dealing with pairs in Emacs.
     (after-init . global-undo-tree-mode))
 #+END_SRC
 
+** zop-to-char
+Visual zap-to-char.
+
+#+begin_src emacs-lisp
+  (use-package zop-to-char
+    :bind
+    ([remap zap-to-char] . zop-to-char))
+#+end_src
 * Font
 ** default config
 elisp Chapter 39 section 39.12 describes more technology about faces. Read it
