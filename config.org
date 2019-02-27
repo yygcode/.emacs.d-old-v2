@@ -299,6 +299,7 @@ See =C-h i (elisp) Defining Minor Modes= for details.
   (global-unset-key (kbd "C-x <right>"))
   (global-unset-key (kbd "C-x C-x")) ;; Reserve as a prefix.
   (global-set-key (kbd "C-x C-x C-x") #'exchange-point-and-mark)
+  (global-set-key (kbd "C-x C-x C-k") #'kill-whole-line)
 
   ;; See https://www.vt100.net/docs/vt510-rm/chapter8
   ;; Both VT-<find> and PC-<home> send [CSI 1~], VT-<select> and PC-<end> send
@@ -329,7 +330,7 @@ See =C-h i (elisp) Defining Minor Modes= for details.
       (define-key map (kbd "C-c q e") #'y/open-file-english-words)
       (define-key map (kbd "C-h q") #'y/kill-help)
       (define-key map (kbd "C-o") #'other-window)
-      (define-key map (kbd "C-x o" #'open-line))
+      (define-key map (kbd "C-x o") #'open-line)
       (define-key map (kbd "C-x C-p") #'previous-buffer)
       (define-key map (kbd "C-x C-n") #'next-buffer)
       map))
@@ -417,10 +418,7 @@ See =C-h i (elisp) Defining Minor Modes= for details.
           desktop-save t ;; no ask
           ;; restoring frame is generally unexpected
           desktop-restore-frames nil)
-    (message "DDD D1")
-    (desktop-save-mode 1)
-    (message "DDD D2")
-  )
+    (desktop-save-mode 1))
 
   (setq-default
    inhibit-splash-screen t
