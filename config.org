@@ -383,6 +383,8 @@ See =C-h i (elisp) Defining Minor Modes= for details.
   (setq line-move-visual nil)
   (setq read-quoted-char-radix 16)
 
+  (setq find-file-suppress-same-file-warnings t)
+
   ;; simplify prompt
   (defalias 'yes-or-no-p 'y-or-n-p)
 
@@ -464,6 +466,9 @@ See =C-h i (elisp) Defining Minor Modes= for details.
 ** ui
 Config for emacs daemon and non-daemon.
 #+BEGIN_SRC emacs-lisp
+  ;; half width fringe
+  (set-fringe-mode 4)
+
   ;; A light that follows your cursor around so you don't lose it!
   ;; https://github.com/Malabarba/beacon
   (use-package beacon
@@ -1707,6 +1712,17 @@ Force to parse all source file in a specific directory:
     :config
     (fa-config-default))
 #+END_SRC
+
+** vc
+version control.
+
+#+begin_src emacs-lisp
+  (require 'vc)
+  (setq vc-follow-symlinks t)
+
+  ;; git commit log
+  (add-to-list 'auto-mode-alist '("COMMIT_EDITMSG" . log-edit-mode))
+#+end_src
 
 ** whitespace
 *whitespace* render a space, tabs, newlines to a visible glyph.

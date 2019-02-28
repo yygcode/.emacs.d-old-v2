@@ -31,13 +31,13 @@
 ;;
 ;; EMACS_Y_PACKAGE_NO_MIRROR:
 ;;   Set a non empty value to disable package mirror.  I use tsinghua mirror
-;;   because the official melpa sites are blocked by GFW. However, I use
+;;   because the official melpa sites are blocked by GFW.  However, I use
 ;;   official website if https_proxy or http_proxy are set.
 ;;   e.g.: export EMACS_Y_PACKAGE_NO_MIRROR=1
 ;;
 ;; EMACS_Y_PACKAGE_FORCE_MIRROR:
 ;;   Set a non empty value to force use tsinghua mirror site even if proxy is
-;;   set. And emacs will remove proxy set too.
+;;   set.  And Emacs will remove proxy set too.
 ;;   e.g.: export EMACS_Y_PACKAGE_FORCE_MIRROR=1
 ;;
 ;; EMACS_Y_PACKAGE_FORCE_MIRROR_HTTP
@@ -174,7 +174,7 @@
 ;; HomePage: https://jwiegley.github.io/use-package/
 (unless (or (package-installed-p 'use-package)
             (package-install 'use-package))
-  (error "Install use-package failed."))
+  (error "Install use-package failed"))
 (eval-when-compile
   (require 'use-package)
   (setq use-package-always-ensure t)
