@@ -137,7 +137,7 @@ analyze config.org time proportion.
     "Profiling emacs startup time. Show result as a tree.")
 #+END_SRC
 
-* Useful Routines
+* Routines
 - Global useful routines;
 - Misc routines;
 
@@ -975,6 +975,13 @@ Smartparens is a minor mode for dealing with pairs in Emacs.
     (after-init . ivy-mode))
 #+END_SRC
 
+** terminal
+#+begin_src emacs-lisp
+  ;; terminal with x clipboard
+  (use-package xclip
+    :pin gnu)
+#+end_src
+
 ** undo tree
 - Github: https://github.com/apchamberlain/undo-tree.el
 
@@ -1232,6 +1239,8 @@ https://emacs.stackexchange.com/a/3044.
     :init
     (setq org-pomodoro-length 30
           org-pomodoro-format "%s"))
+
+  (use-package redtick)
 #+END_SRC
 
 ** publish
@@ -1498,6 +1507,15 @@ Read variable c-offsets-alist for more details.
   (add-hook 'c-mode-common-hook 'y/c-style-hook)
 #+END_SRC
 
+** call-graph
+C++ cakll graph: https://github.com/beacoder/call-graph
+#+begin_src emacs-lisp
+  (use-package call-graph
+    :bind
+    (:map c-mode-base-map
+          ("C-x g g" . call-graph)))
+#+end_src
+
 ** cmake
 #+BEGIN_SRC emacs-lisp
   (use-package cmake-mode)
@@ -1623,6 +1641,12 @@ config.
 #+BEGIN_SRC emacs-lisp
   (use-package magit)
 #+END_SRC
+
+** protobuf-mode
+google protobuf mode.
+#+begin_src emacs-lisp
+  (use-package protobuf-mode)
+#+end_src
 
 ** semantic
 See =~/.emacs.d/lisp/y-company.el=
