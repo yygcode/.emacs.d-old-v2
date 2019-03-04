@@ -30,6 +30,8 @@
 
 ;; https://company-mode.github.io/
 ;; https://github.com/company-mode/company-mode
+
+(require 'cc-mode)
 (use-package company
   :diminish
   :init

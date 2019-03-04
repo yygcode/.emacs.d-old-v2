@@ -137,19 +137,22 @@ analyze config.org time proportion.
     "Profiling emacs startup time. Show result as a tree.")
 #+END_SRC
 
-* Routines
-- Global useful routines;
-- Misc routines;
+* Common
+- basic routines for config
+- basic packages for config
 
 #+BEGIN_SRC emacs-lisp
+  ;; require if exists
+  (require 'y-misc nil t)
+
   (defun y/add-after-init-hook(func)
     "Add FUNC to after-init or frame-create hook."
     (if (daemonp)
         (add-hook 'after-make-frame-functions func)
       (add-hook 'after-init-hook func)))
 
-  ;; require if exists
-  (require 'y-misc nil t)
+  (use-package hydra
+    :demand t) ;; used by ivy
 #+END_SRC
 * Keybinds
 ** principle
@@ -467,7 +470,8 @@ See =C-h i (elisp) Defining Minor Modes= for details.
 Config for emacs daemon and non-daemon.
 #+BEGIN_SRC emacs-lisp
   ;; half width fringe
-  (set-fringe-mode 4)
+  (when (fboundp 'fringe-mode)
+    (set-fringe-mode 4))
 
   ;; A light that follows your cursor around so you don't lose it!
   ;; https://github.com/Malabarba/beacon
@@ -588,7 +592,7 @@ Disable mouse globally.
 ** window
 #+begin_src emacs-lisp
   (defhydra y/window-hydra
-    (global-map "C-x C-x w" :foreign-keys warn)
+    (global-map "C-x C-x w")
     "window hydra"
     ("=" enlarge-window-horizontally "enlarge-window")
     ("+" enlarge-window-horizontally "enlarge-window")
