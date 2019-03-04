@@ -362,6 +362,7 @@ See =C-h i (elisp) Defining Minor Modes= for details.
       (define-key map (kbd "b") #'backward-char)
       (define-key map (kbd "l") #'backward-word)
       (define-key map (kbd "r") #'forward-word)
+      (define-key map (kbd "TAB") #'forward-symbol)
       map))
 
   (defun y/read-only-keybind-switch()
