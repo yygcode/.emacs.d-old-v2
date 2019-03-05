@@ -115,10 +115,10 @@
   (global-semantic-idle-summary-mode 1)
   (global-semantic-mru-bookmark-mode 1)
   (global-semantic-stickyfunc-mode 1)
-  (global-semantic-idle-local-symbol-highlight-mode 1)
-  (custom-set-faces
-   '(semantic-idle-symbol-highlight
-     ((t (:foreground "darkgoldenrod" :background "gray20" :weight bold)))))
+  ;; (global-semantic-idle-local-symbol-highlight-mode 1)
+  ;; (custom-set-faces
+  ;;  '(semantic-idle-symbol-highlight
+  ;;    ((t (:foreground "darkgoldenrod" :background "gray20" :weight bold)))))
   ;; (semanticdb-enable-gnu-global-databases 'c-mode t)
   ;; (semanticdb-enable-gnu-global-databases 'c++-mode t)
   ;; Turn off follow modes default
