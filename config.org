@@ -1588,6 +1588,11 @@ Put all in y-init-tags.el
 
   (use-package counsel-gtags
     :diminish
+    :init
+    (advice-add 'counsel-gtags-dwim :before
+                #'(lambda()
+                    "Push marker for jump back."
+                    (xref-push-marker-stack)))
     :bind
     (:map counsel-gtags-mode-map
           ("C-c g s" . counsel-gtags-find-symbol)
