@@ -363,9 +363,9 @@ See =C-h i (elisp) Defining Minor Modes= for details.
       (define-key map (kbd "l") #'backward-word)
       (define-key map (kbd "r") #'forward-word)
       (define-key map (kbd "TAB") #'sp-forward-symbol)
-      (define-key map (kbd "<backtab>") #'sp-backward-symbol)
-      (define-key map (kbd "RET") #'y/tags-jump-symbol)
-      (define-key map (kbd "DEL") #'xref-pop-marker-stack)
+      ;; (define-key map (kbd "<backtab>") #'sp-backward-symbol)
+      ;; (define-key map (kbd "RET") #'y/tags-jump-symbol)
+      ;; (define-key map (kbd "DEL") #'xref-pop-marker-stack)
       map))
 
   (defun y/read-only-keybind-switch()
@@ -402,8 +402,8 @@ See =C-h i (elisp) Defining Minor Modes= for details.
 
   (setq byte-compile-warnings '(not free-vars))
 
-  ;; prefer split window vertically
-  (setq split-width-threshold 80)
+  (setq split-width-threshold 180
+        split-height-threshold 100)
 
   ;; nice scrolling
   (setq scroll-margin 0
@@ -685,7 +685,8 @@ Optimize fcitx behavior.
       (fcitx-aggressive-setup)
       (fcitx-prefix-keys-turn-on)
       (fcitx-prefix-keys-add "C-x" "C-c" "C-h" "M-s" "M-o")
-      (setq fcitx-use-dbus t)))
+      ;; (setq fcitx-use-dbus t)
+      ))
 #+END_SRC
 
 * Efficiency
@@ -1252,9 +1253,25 @@ https://emacs.stackexchange.com/a/3044.
 #+END_SRC
 
 ** publish
-A big topic, finish later.
+A big section. See [[#publish][Publish]].
 
 * Development
+** asm-mode
+#+BEGIN_SRC emacs-lisp
+  (require 'asm-mode)
+
+  (defun asm-calculate-indentation ()
+    (or
+     ;; Flush labels to the left margin.
+     (and (looking-at "\\(\\sw\\|\\s_\\)+:") 0)
+     ;; Same thing for `;;;' comments.
+     (and (looking-at "\\s<\\s<\\s<") 0)
+     ;; Simple `;' comments go to the comment-column.
+     (and (looking-at "\\s<\\(\\S<\\|\\'\\)") comment-column)
+     ;; The rest goes at the first tab stop.
+     ;; (or (indent-next-tab-stop 0)) ;; This line is original one
+     (or 4)))
+#+END_SRC
 ** c/c++ style
 Use c-guess-no-install and c-guess-view to generate style template.
 Read variable c-offsets-alist for more details.
@@ -1985,6 +2002,363 @@ HTML, CSS and more.
     :bind-keymap ("C-c s g" . google-this-mode-submap)
     :hook
     (after-init . google-this-mode))
+#+END_SRC
+
+* Publish
+  :PROPERTIES:
+  :CUSTOM_ID: publish
+  :END:
+** html
+   :PROPERTIES:
+   :CUSTOM_ID: publish-config
+   :END:
+DO NOT modify the custom-id publish-config, The batch scripts use it to load
+elisp snippet properly.
+
+- htmlize
+  + Convert buffer text and decorations to HTML. Need by org-publish.
+  + GitHub: https://github.com/hniksic/emacs-htmlize
+
+- org publish
+  + Convert org files to HTMLs, and update exported pages to web server.
+  + Manual: https://orgmode.org/manual/Publishing.html
+  + Worg: https://orgmode.org/worg/org-tutorials/org-publish-html-tutorial.html
+
+- Layout Example: source ~/org/h/, publish to ~/hp (h/hp is abbrs of homepage).
+#+BEGIN_SRC text
+~/org/h/            <-- Root of homepage
+├── index.org       <-- Index org (generate index.html)
+├── blogs           <-- Blogs
+├── mm              <-- All images/videos
+├── res             <-- css/js/icons
+#+END_SRC
+
+#+BEGIN_SRC emacs-lisp
+  (use-package htmlize)
+
+  (defun y:file-string(file)
+    (let ((f (expand-file-name file user-emacs-directory)))
+      (if (file-readable-p f)
+          (with-temp-buffer (insert-file-contents f) (buffer-string))
+        "")))
+
+  (use-package org
+    :pin org
+    :ensure org-plus-contrib
+    :init
+    (require 'ox)
+    (require 'ox-html)
+    (require 'ox-publish)
+    (require 'ox-rss)
+    (setq org-export-default-language "zh-CN")
+    (setq org-html-coding-system 'utf-8-unix)
+    (setq org-html-viewport nil) ;; FIXME: what exactly this ?
+    ;; colored code, invalid for batch mode because no font fontify
+    ;; (setq org-html-table-default-attributes '(:class "table table-hover"))
+    (setq org-html-table-default-attributes nil)
+    (setq org-html-htmlize-output-type 'css)
+    (setq org-html-head-include-default-style nil)
+    (setq org-html-head-include-scripts nil)
+    (setq org-export-with-priority t)
+    (setq org-export-with-sub-superscripts '{})
+    (setq org-html-preamble (y:file-string "misc/publish-blog-preamble.html"))
+    (setq org-html-postamble (y:file-string "misc/publish-disqus.html"))
+    (setq org-html-head (y:file-string "misc/publish-blog-head.html"))
+    (setq org-time-stamp-custom-formats '("%F" . "%F %H:%M"))
+    (setq-default org-display-custom-times t)
+    (add-to-list 'org-structure-template-alist
+                 (list "p" "#+BEGIN_PREVIEW\n?\n#+END_PREVIEW")))
+
+  ;; eliminate extra whitespace of zh multiline.
+  (defadvice org-html-paragraph (before org-html-paragraph-advice
+                                        (paragraph contents info) activate)
+    "Join consecutive Chinese lines into a single long line without
+            unwanted space when exporting org-mode to html."
+    (let* ((origin-contents (ad-get-arg 1))
+           (fix-regexp "[[:multibyte:]]")
+           (fixed-contents
+            (replace-regexp-in-string
+             (concat "\\(" fix-regexp "\\) *\n *\\(" fix-regexp "\\)")
+             "\\1\\2" origin-contents)))
+      (ad-set-arg 1 fixed-contents)))
+
+  (defun y:blog-sitemap(title &optional list)
+    "Generate Sitemap Items for TITLE and LIST."
+    (let ((contents
+           (with-temp-buffer
+             (insert (org-list-to-org list))
+             (goto-char (point-min))
+             (when (re-search-forward "[[file:theindex.org][Index]]" nil t)
+               (move-beginning-of-line nil)
+               (kill-line)
+               (message "Remove the item Index in sitemap."))
+             (buffer-string))))
+      (concat "#+TITLE: " title "\n------\n\n" contents)))
+
+  (defun y:main-sitemap(title &optional list)
+    "Generate Sitemap Items for TITLE and LIST."
+    (let ((contents
+           (with-temp-buffer
+             (insert (org-list-to-org list))
+             (goto-char (point-min))
+             (when (re-search-forward "[[file:theindex.org][Index]]" nil t)
+               (move-beginning-of-line nil)
+               (kill-line))
+             (buffer-string))))
+      (concat "#+TITLE: " title "\n------\n\n" contents)))
+
+  (defun y:publish-file-string(project file1 &optional file2)
+    "Get String from FILE1 or FILE2.
+  If filename is not absolute, then use PROJECT directory for FILE1
+  and `user-emacs-directory` for FILE2."
+    (let* ((dir (plist-get project :base-directory))
+           (f (expand-file-name file1 dir)))
+      (unless (file-readable-p f)
+        (setq f (expand-file-name (or file2 file1) user-emacs-directory)))
+      (message "Try file project(%s) file(%s)" dir f)
+      (if (file-readable-p f)
+          (with-temp-buffer (insert-file-contents f) (buffer-string))
+        "")))
+
+  (defun y:publish-common-preparation(project file)
+    "Publish Preparation html-head-extra for PROJECT.
+  FILE is default one if head.html could not find in project directory."
+
+    ;; FIX: ox-publish bug `org-publish-find-date` for date in org file.
+    (defun org-publish-find-date(file project)
+      (y:org-publish-find-date file project))
+
+    (plist-put project :html-head-extra
+               ;; customized head.html have high priority
+               (y:publish-file-string project "head.html" file)))
+
+  (defun y:publish-common-completion(project)
+    "Complete for PROJECT."
+    (message "Complete project(%s)" (plist-get project :base-directory)))
+
+  (defun y:blog-preparation(project)
+    (y:publish-common-preparation project "misc/publish-blog-head.html"))
+
+  (defun y:main-preparation(project)
+    (y:publish-common-preparation project "misc/publish-main-head.html"))
+
+  (defun y:blog-completion(project)
+    (y:publish-common-completion project))
+
+  (defun y:main-completion(project)
+    (y:publish-common-completion project))
+
+  (defun y:blog-preamble(project)
+    (y:publish-file-string project "preamble.html"
+                           "misc/publish-blog-preamble.html"))
+
+  (defun y:project-postamble(project)
+    "Return html postamble string of PROJECT."
+    (let* ((pathname (plist-get project :output-file))
+           (dirname (file-name-directory pathname))
+           (filename (file-name-nondirectory pathname))
+           (disqus) (postamble-file))
+
+      ;; discard prefix of dirname
+      (setq dirname (replace-regexp-in-string ".*/hp/" "" dirname))
+
+      ;; disqus config
+      (setq disqus (y:file-string "misc/publish-disqus.html"))
+      (setq disqus (replace-regexp-in-string
+                    "PAGE_URL"
+                    (format "'http://ycode.org/%s%s'" dirname filename) disqus t))
+      (setq disqus (replace-regexp-in-string "PAGE_IDENTIFIER"
+                                             (concat "'" filename "'")disqus t))
+
+      ;; set postamble file depends on directory
+      (cond ((string-match "^$" dirname)
+             (setq postamble-file "misc/publish-main-postamble.html"))
+            ((string-match "^blogs/$" dirname)
+             (setq postamble-file "misc/publish-blog-postamble.html")))
+
+      ;; generate postamble string
+      (message "============f=%s dirname='%s'" postamble-file dirname)
+      (format "%s\n%s" disqus
+              (y:publish-file-string project "postamble.html" postamble-file))))
+
+  (defun y:blog-postamble(project)
+    (y:publish-file-string project "postamble.html"
+                           "misc/publish-blog-postamble.html")
+    (message "hello run postamble: %s(%s)" (plist-get project :author)
+                (file-name-nondirectory (plist-get project :output-file))))
+
+  (defun y:main-preamble(project)
+    (y:publish-file-string project "preamble.html"
+                           "misc/publish-main-preamble.html"))
+
+  (defun y:main-postamble(project)
+    (y:publish-file-string project "postamble.html"
+                           "misc/publish-main-postamble.html"))
+
+  (defun y:org-publish-find-date(entry project)
+    "Fix bug of org-publish-find-date fpr ENTRY, PROJECT."
+    (let* ((date (org-publish-find-property entry :date project)))
+      ;; format-time-string don't know YYYY-MM-DD;
+      ;; so convert YYYY-MM-DD to YYYY-MM-DD 00:00
+      (if date
+          (progn
+            (setq date (org-no-properties
+                        (org-element-interpret-data date)))
+            (unless (string-match "[1-9]:[0-5]" date)
+              (setq date (concat date " 00:00")))
+            (setq date (safe-date-to-time date)))
+        (setq date (current-time)))
+      date))
+
+  (defun y:sitemap-format-entry(entry style project)
+    "Add Date Prefix for ENTRY STYLE PROJECT."
+    (cond ((not (directory-name-p entry))
+           (let* ((date (y:org-publish-find-date entry project)))
+             (format "[%s] [[file:%s][%s]]"
+                     (format-time-string "%F" date) entry
+                     (org-publish-find-title entry project))))
+          ((eq style 'tree)
+           ;; Return only last subdir.
+           (file-name-nondirectory (directory-file-name entry)))
+          (t entry)))
+
+  (setq org-publish-project-alist
+        `(("blogs"
+           :base-directory "~/org/h/blogs/"
+           :base-extension "org"
+           :publishing-directory "~/hp/blogs/"
+           :preparation-function y:blog-preparation
+           :completion-function y:blog-completion
+           :recursive t
+           :headline-levels 4
+           :auto-sitemap t
+           :auto-sitemap t
+           :sitemap-filename "archives.org"
+           :sitemap-function y:blog-sitemap
+           :sitemap-format-entry y:sitemap-format-entry;; org-publish-find-date
+           :sitemap-title "Archives"
+           :sitemap-sort-files anti-chronologically
+           :sitemap-style list
+           :makeindex t
+           :auto-preamble t
+           :author "yanyg"
+           :email "yygcode@gmail.com"
+           :html-link-home ""
+           :html-link-up ""
+           :html-preamble y:blog-preamble
+           :html-head nil ;; see y:blog-prepartion
+           :html-head-extra nil;; see y:blog-prepartion
+           :html-postamble y:project-postamble
+           :publishing-function org-html-publish-to-html
+           :section-numbers t
+           :htmlized-source t
+           :with-toc t)
+          ("attachment" ;; all sites attachments put together
+           :base-directory "~/org/h/"
+           :base-extension "css\\|js\\|png\\|jpg\\|gif\\|pdf\\|mp3\\|ogg\\|mp4\\|ttf"
+           :publishing-directory "~/hp/"
+           :recursive t
+           :publishing-function org-publish-attachment
+           )
+          ("main"
+           :base-directory "~/org/h/"
+           :base-extension "org"
+           :publishing-directory "~/hp/"
+           :recursive nil
+           :preparation-function y:main-preparation
+           :completion-function y:main-completion
+           :headline-levels 4
+           :auto-sitemap t
+           :auto-sitemap t
+           :sitemap-function y:main-sitemap
+           :sitemap-format-entry y:sitemap-format-entry;; org-publish-find-date
+           :sitemap-filename "main.org"
+           :sitemap-title "Main Archives"
+           :sitemap-sort-files anti-chronologically
+           :sitemap-style list
+           :makeindex t
+           :auto-preamble t
+           :author "yanyg"
+           :email "yygcode@gmail.com"
+           :html-link-home ""
+           :html-link-up ""
+           :html-preamble y:main-preamble
+           :html-head nil
+           :html-head-extra nil
+           :html-postamble y:project-postamble
+           :publishing-function org-html-publish-to-html
+           :section-numbers t
+           :htmlized-source t
+           :with-toc t)
+          ("papers"
+           :base-directory "~/org/h/papers"
+           :base-extension "org"
+           :publishing-directory "~/hp/papers/"
+           :recursive nil
+           :preparation-function nil
+           :completion-function nil
+           :headline-levels 4
+           :auto-sitemap t
+           :auto-sitemap t
+           :sitemap-function nil
+           :sitemap-format-entry nil
+           :sitemap-filename nil
+           :sitemap-title nil
+           :sitemap-sort-files anti-chronologically
+           :sitemap-style list
+           :makeindex t
+           :auto-preamble t
+           :author "yanyg"
+           :email "yygcode@gmail.com"
+           :html-link-home "../index.html"
+           :html-link-up ""
+           :html-preamble nil
+           :html-head nil
+           :html-head-extra nil
+           :html-postamble y:project-postamble
+           :publishing-function org-html-publish-to-html
+           :section-numbers t
+           :htmlized-source t
+           :with-toc t)
+          ("sites"
+           :components ("attachment" "main" "blogs" "papers"))))
+
+  (defun y:publish-sites()
+    "Publish Sites."
+    (interactive)
+    (save-excursion
+      ;;(setenv "HOME" "/home/yanyg/edebug")
+      (call-process-shell-command "touch ~/org/h/blogs/*.org && echo touched"
+                                  nil "*Shell Output*" t)
+      (call-process-shell-command "emacs --batch -l ~/.emacs.d/init.el"
+                                  nil "*Shell Output*" t)
+      ;;(setenv "HOME" "/home/yanyg")
+      ))
+  (global-set-key (kbd "C-c p") 'y:publish-sites)
+#+END_SRC
+
+* Deep Customize
+#+BEGIN_SRC emacs-lisp
+  (defun y/replace-ligatures()
+    "Execute function to replace ligatures ff, ffi, fi."
+    (interactive)
+    (save-excursion
+      (let ((c 0))
+        (dolist (patn '(("ﬃ" . "ffi") ("ﬂ" . "fl") ("ﬁ" . "fi")
+                        ("ﬀ" . "ff") ("ﬄ" . "ffl") ("’" . "'")
+                        ("‘‘" . "\"") ("’’" . "\"") ("''" . "\"")))
+          (goto-char (point-min))
+          (let* ((s (car patn))
+                 (d (cdr patn))
+                 (cc 0))
+            (while (re-search-forward s nil t)
+              (setq cc (+ 1 cc))
+              (replace-match d nil nil))
+            (setq c (+ c cc))
+            (message "Replace ligatures %2d: %s --> %s" cc s d)))
+        (message "Replaces ligatures count: %d" c))))
+
+  (global-set-key (kbd "C-x C-x r") #'y/replace-ligatures)
 #+END_SRC
 
 * Footer
