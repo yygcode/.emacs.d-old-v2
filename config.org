@@ -628,6 +628,7 @@ and select zenburn as default.
 
   ;; my favorite theme
   (load-theme 'zenburn t)
+  ;; (load-theme 'monokai t)
 #+END_SRC
 
 * Platform Specific
@@ -1543,7 +1544,9 @@ C++ cakll graph: https://github.com/beacoder/call-graph
 
 ** cmake
 #+BEGIN_SRC emacs-lisp
-  (use-package cmake-mode)
+  (use-package cmake-mode
+    :config
+    (setq cmake-tab-width 4))
   (use-package cmake-font-lock
     :pin melpa)
 #+END_SRC
