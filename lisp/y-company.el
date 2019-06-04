@@ -128,7 +128,7 @@
   ;; (global-semantic-show-unmatched-syntax-mode 1)
   ;; (global-semantic-decoration-mode 1)
   (setq semantic-idle-scheduler-idle-time 1
-        semantic-idle-scheduler-work-idle-time 30
+        semantic-idle-scheduler-work-idle-time 1
         semantic-displayor-tooltip-initial-max-tags 10
         semantic-displayor-tooltip-mode "verbose"
         ;; semanticdb-implied-include-tags t

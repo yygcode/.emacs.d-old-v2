@@ -29,21 +29,21 @@
 ;;
 ;; Enviroment Variable Description
 ;;
-;; EMACS_Y_PACKAGE_NO_MIRROR:
+;; EMACS_NO_MIRROR:
 ;;   Set a non empty value to disable package mirror.  I use tsinghua mirror
 ;;   because the official melpa sites are blocked by GFW.  However, I use
 ;;   official website if https_proxy or http_proxy are set.
-;;   e.g.: export EMACS_Y_PACKAGE_NO_MIRROR=1
+;;   e.g.: export EMACS_NO_MIRROR=1
 ;;
-;; EMACS_Y_PACKAGE_FORCE_MIRROR:
+;; EMACS_FORCE_MIRROR:
 ;;   Set a non empty value to force use tsinghua mirror site even if proxy is
 ;;   set.  And Emacs will remove proxy set too.
-;;   e.g.: export EMACS_Y_PACKAGE_FORCE_MIRROR=1
+;;   e.g.: export EMACS_FORCE_MIRROR=1
 ;;
-;; EMACS_Y_PACKAGE_FORCE_MIRROR_HTTP
+;; EMACSFORCE_MIRROR_HTTP
 ;;   Set a non empty value to use package mirror with http protocol.  Please
 ;;   do not set this env if your system support SSL/TLS(https).
-;;   e.g.: export EMACS_Y_PACKAGE_FORCE_MIRROR_HTTP=1
+;;   e.g.: export EMACS_FORCE_MIRROR_HTTP=1
 ;;
 ;; http_proxy, https_proxy, HTTP_PROXY, HTTPS_PROXY
 ;;   Proxy configure.  Turn back to use official website if proxy is set.
@@ -135,20 +135,20 @@
           ("melpa-stable" .
            "http://mirrors.tuna.tsinghua.edu.cn/elpa/melpa-stable/"))))
 
-(if (or (getenv "EMACS_Y_PACKAGE_NO_MIRROR") (getenv "https_proxy"))
+(if (or (getenv "EMACS_NO_MIRROR") (getenv "https_proxy"))
     (y/set-package-archives-official)
   (y/set-package-archives-mirror))
 
-;; Set follow env if your system does not support https
-(when (getenv "EMACS_Y_PACKAGE_FORCE_MIRROR_HTTP")
-  (y/set-package-archives-mirror-http)
+;; FORCE_MIRROR env overrides NO_MIRROR or proxy
+(when (getenv "EMACS_FORCE_MIRROR")
+  (y/set-package-archives-mirror)
   ;; Also remove proxy config.
   (dolist (e '("http_proxy" "https_proxy" "HTTP_PROXY" "HTTPS_PROXY"))
           (setenv e nil)))
 
-;; FORCE_MIRROR env overrides NO_MIRROR or proxy
-(when (getenv "EMACS_Y_PACKAGE_FORCE_MIRROR")
-  (y/set-package-archives-mirror)
+;; Set follow env if your system does not support https
+(when (getenv "EMACS_FORCE_MIRROR_HTTP")
+  (y/set-package-archives-mirror-http)
   ;; Also remove proxy config.
   (dolist (e '("http_proxy" "https_proxy" "HTTP_PROXY" "HTTPS_PROXY"))
           (setenv e nil)))
