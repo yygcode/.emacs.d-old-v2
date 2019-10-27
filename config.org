@@ -2069,8 +2069,7 @@ elisp snippet properly.
     (setq org-html-head (y:file-string "misc/publish-blog-head.html"))
     (setq org-time-stamp-custom-formats '("%F" . "%F %H:%M"))
     (setq-default org-display-custom-times t)
-    (add-to-list 'org-structure-template-alist
-                 (list "p" "#+BEGIN_PREVIEW\n?\n#+END_PREVIEW")))
+    (add-to-list 'org-structure-template-alist '("p" . "preview")))
 
   ;; eliminate extra whitespace of zh multiline.
   (defadvice org-html-paragraph (before org-html-paragraph-advice

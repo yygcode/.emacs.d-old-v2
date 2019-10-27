@@ -1,6 +1,6 @@
 ;;; ~/.emacs.d/init.el --- Emacs Initialization/Customization File
 
-;; Copyright (C) 2017-2019 yonggang.yyg<yygcode@gmail.com>
+;; Copyright (C) 2017-2020 yonggang.yyg<yygcode@gmail.com>
 
 ;; Author: yonggang.yyg<yygcode@gmail.com>
 ;; Maintainer: yonggang.yyg<yygcode@gmail.com>
@@ -51,8 +51,8 @@
 
 ;;; Code:
 
-(when (version< emacs-version "26.1")
-  (warn "This config does not test for emacs version before 26.1"))
+(when (version< emacs-version "26.3")
+  (warn "The config was not tested before emacs 26.3"))
 
 ;; disable trival compile warnings
 (setq byte-compile-warnings
@@ -62,24 +62,23 @@
 ;; garbage collection change to 64MB for performance optimize
 (setq gc-cons-threshold (* 64 1024 1024))
 
+;; set to utf-8-unix, otherwise pakcage install blames with
+;; 'Selecting Coding System ...'
+(prefer-coding-system 'utf-8-unix)
+
+;; package - Simple package system for Emacs. Built-in
+(require 'package)
+
 ;; Define as early as possible.
 (defconst user-init-config (expand-file-name "config.org" user-emacs-directory)
   "File name, including directory, of initialization file by org-babel.")
 
-;;; My Helper/Common routine
+;;; Helper/common lisp routine directory
 (add-to-list 'load-path (expand-file-name "lisp" user-emacs-directory))
 
-;;; Proxy environment process
-(defvar y/no-proxy-list (mapconcat 'identity
-                         '("*.cn"
-                          "*.jd.com"
-                          "*.baidu.com"
-                          "*.bing.*"
-                          "*.csdn.*"
-                          "*.qq.*"
-                          ;; Please add new site
-                          ) ",")
-  "Sites list for no-proxy, only used for proxy scene.")
+;;; Proxy environment config.
+;; Support http_proxy or https_proxy env. e.g.:
+;; export https_proxy=https://127.0.0.1:8888
 (defun y/env-set(env val &optional force)
   "Set enviroment ENV to VAL if ENV unset or FORCE is t."
   (when (or (not (getenv env)) force)
@@ -89,18 +88,42 @@
   (or (getenv env1) (y/env-set env1 (getenv env2)))
   (or (getenv env2) (y/env-set env2 (getenv env1))))
 (y/env-sync-partner "https_proxy" "http_proxy")
-;; set no_proxy env if empty
-(y/env-set "no_proxy" y/no-proxy-list)
 
-;; set to utf-8-unix, otherwise pakcage install blames with
-;; 'Selecting Coding System ...'
-(prefer-coding-system 'utf-8-unix)
+;; Update no_proxy env
+(defvar y/no-proxy-sites (let ((env (getenv "no_proxy")))
+                           (and env (split-string env ",")))
+  "No-proxy sites list for net proxy.")
 
-;; package - Simple package system for Emacs. Built-in
-(require 'package)
+(defun y/add-no-proxy-sites(&rest sites)
+  "Add SITES to no-proxy-sites list one by one if not exist."
+  (dolist (s sites)
+    (or
+     ;; ignore if nil
+     (not s)
+     ;; append to list if a string
+     (and (stringp s)
+          (or (= (length s) 0)
+              (add-to-list 'y/no-proxy-sites s t)))
+     ;; recursive called itself if s is a list
+     (and (listp s)
+          (progn (y/add-no-proxy-sites (car s))
+                 (y/add-no-proxy-sites (cdr s)))
+          t)
+     (warn "Unknown type(%s) object: %S" (type-of s) s)))
+  y/no-proxy-sites)
+(y/add-no-proxy-sites '("" "*.cn"
+                        "*.aliyun.com"
+                        "*.tmall.com"
+                        "*.youku.com"
+                        "*.jd.com"
+                        "*.bing.com"
+                        "*.baidu.com"
+                        "*.csdn.net"
+                        "*.qq.com"))
+(y/env-set "no_proxy" (mapconcat 'identity y/no-proxy-sites ",") t)
 
 ;; Archive site
-;; Emacs archives-site is isolated by GFW, use mirror site if no proxy
+;; Emacs archives-site is isolated by GFW, use mirror site if no proxy in china
 (defun y/set-package-archives-official()
   "Set package-archives to melpa.org if https-proxy enabled or FORCE non-nil."
   (interactive)
@@ -203,8 +226,8 @@
   ;; https://github.com/quelpa/quelpa-use-package#overriding-use-package-always-ensure
   (quelpa-use-package-activate-advice))
 
-;; Reload init emacs.
-;; But reload is different with restart, old config may be left. e.g. key bind.
+;; Reload emacs init file. Notice that reload is different with restart,
+;; old config may be left. e.g. key bind.
 (global-set-key (kbd "C-c q r")
                 #'(lambda()(interactive) (load-file user-init-file)))
 
@@ -235,6 +258,7 @@
   :pin org)
 
 ;; load literate config.
+;; use env @EMACS_Y_INTERNAL_ESUP_PROFILER to prevent reload recursively.
 (when (and (file-exists-p user-init-config)
            (not (string= (getenv "EMACS_Y_INTERNAL_ESUP_PROFILER") "y/esup")))
   (org-babel-load-file user-init-config))
