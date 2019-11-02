@@ -30,26 +30,26 @@
 ;; Enviroment Variable Description
 ;;
 ;; EMACS_NO_MIRROR:
-;;   Set a non empty value to disable package mirror.  I use tsinghua mirror
-;;   because the official melpa sites are blocked by GFW.  However, I use
-;;   official website if https_proxy or http_proxy are set.
+;;   Set env to 1 to disable package-archives mirror, and install packages
+;;   from official sites.  The config uses tsinghua mirror by default because
+;;   the official melpa sites are blocked by GFW.
 ;;   e.g.: export EMACS_NO_MIRROR=1
 ;;
-;; EMACS_FORCE_MIRROR:
-;;   Set a non empty value to force use tsinghua mirror site even if proxy is
-;;   set.  And Emacs will remove proxy set too.
-;;   e.g.: export EMACS_FORCE_MIRROR=1
+;; EMACS_MIRROR_HTTP
+;;   Set env to 1 install packages from the mirror site by http protocol.
+;;   Do not set this env unless your system does not support SSL/TLS(https).
+;;   e.g.: export EMACS_MIRROR_HTTP=1
 ;;
-;; EMACSFORCE_MIRROR_HTTP
-;;   Set a non empty value to use package mirror with http protocol.  Please
-;;   do not set this env if your system support SSL/TLS(https).
-;;   e.g.: export EMACS_FORCE_MIRROR_HTTP=1
-;;
-;; http_proxy, https_proxy, HTTP_PROXY, HTTPS_PROXY
-;;   Proxy configure.  Turn back to use official website if proxy is set.
+;; If both env EMACS_NO_MIRROR and EMACS_MIRROR_HTTP are set, EMACS_NO_MIRROR
+;; will override EMACS_MIRROR_HTTP.
+
+;; http_proxy, https_proxy
+;;   Proxy environment.
 ;;   e.g.: export https_proxy=http://127.0.0.1:8888
 
 ;;; Code:
+
+(defconst y/startup-begin-seconds (float-time))
 
 (when (version< emacs-version "26.3")
   (warn "The config was not tested before emacs 26.3"))
@@ -59,22 +59,43 @@
       '(redefine callargs obsolete noruntime cl-functions interactive-only
         make-local mapcar constants suspicious lexical))
 
-;; garbage collection change to 64MB for performance optimize
-(setq gc-cons-threshold (* 64 1024 1024))
+;; garbage collection change to 128MB for performance optimize
+(setq gc-cons-threshold (* 128 1024 1024))
 
-;; set to utf-8-unix, otherwise pakcage install blames with
-;; 'Selecting Coding System ...'
 (prefer-coding-system 'utf-8-unix)
+
+(defmacro y/file-replace-extension(filename extension)
+  "Replace FILENAME suffix(extension) to EXTENSION."
+  `(concat (file-name-sans-extension ,filename) "." ,extension))
+
+(defmacro y/template-find-file(filename)
+  "Generate a function Y/FIND-FILE--FILENAME which is used to open FILENAME."
+  `(defun ,(intern (format "y/find-file--%s" filename)) ()
+     ,(format "Call `find-file' `%s'." filename)
+     (interactive)
+     (find-file ,filename)))
+
+(defmacro y/template-find-file-and-bind(filename keyseq)
+  "Generate a function which is used to open FILENAME and bind to KEYSEQ."
+  `(global-set-key ,(kbd keyseq)
+                   (y/template-find-file ,filename)))
+
+(defconst y/user-init-config
+  (expand-file-name "config.org" user-emacs-directory)
+  "File name, including directory, of initialization file by org-babel.")
+
+(defconst y/lisp-directory
+  (expand-file-name "lisp" user-emacs-directory)
+  "Extended LISP file directory.")
+
+(y/template-find-file-and-bind user-init-file "C-c q i")
+(y/template-find-file-and-bind y/user-init-config "C-c q c")
 
 ;; package - Simple package system for Emacs. Built-in
 (require 'package)
 
-;; Define as early as possible.
-(defconst user-init-config (expand-file-name "config.org" user-emacs-directory)
-  "File name, including directory, of initialization file by org-babel.")
-
-;;; Helper/common lisp routine directory
-(add-to-list 'load-path (expand-file-name "lisp" user-emacs-directory))
+(add-to-list 'load-path y/lisp-directory)
+(byte-recompile-directory y/lisp-directory 0)
 
 ;;; Proxy environment config.
 ;; Support http_proxy or https_proxy env. e.g.:
@@ -87,96 +108,64 @@
   "Sync enviroment ENV1/ENV2 to another if one is nil and another is non-nil."
   (or (getenv env1) (y/env-set env1 (getenv env2)))
   (or (getenv env2) (y/env-set env2 (getenv env1))))
+
 (y/env-sync-partner "https_proxy" "http_proxy")
 
-;; Update no_proxy env
-(defvar y/no-proxy-sites (let ((env (getenv "no_proxy")))
-                           (and env (split-string env ",")))
-  "No-proxy sites list for net proxy.")
-
 (defun y/add-no-proxy-sites(&rest sites)
-  "Add SITES to no-proxy-sites list one by one if not exist."
-  (dolist (s sites)
-    (or
-     ;; ignore if nil
-     (not s)
-     ;; append to list if a string
-     (and (stringp s)
-          (or (= (length s) 0)
-              (add-to-list 'y/no-proxy-sites s t)))
-     ;; recursive called itself if s is a list
-     (and (listp s)
-          (progn (y/add-no-proxy-sites (car s))
-                 (y/add-no-proxy-sites (cdr s)))
-          t)
-     (warn "Unknown type(%s) object: %S" (type-of s) s)))
-  y/no-proxy-sites)
-(y/add-no-proxy-sites '("" "*.cn"
-                        "*.aliyun.com"
-                        "*.tmall.com"
-                        "*.youku.com"
-                        "*.jd.com"
-                        "*.bing.com"
-                        "*.baidu.com"
-                        "*.csdn.net"
-                        "*.qq.com"))
-(y/env-set "no_proxy" (mapconcat 'identity y/no-proxy-sites ",") t)
+  "Add SITES to environment `no_proxy'."
+  (let ((no-proxy-sites (let ((env (getenv "no_proxy")))
+                          (and env (split-string env ","))))
+        (lambda-add
+         (lambda(&rest sites)
+           (dolist (s sites)
+             (pcase s
+               ('nil t)
+               ((pred stringp)
+                (and (> (length s) 0)
+                     (add-to-list 'no-proxy-sites s t)))
+               ((pred listp)
+                (funcall lambda-add (car s))
+                (funcall lambda-add (cdr s)))
+               (_ (warn "Unknown type(%s) object: %S" (type-of s) s))))
+           no-proxy-sites)))
+    (funcall lambda-add sites)
+    (y/env-set "no_proxy" (mapconcat 'identity no-proxy-sites ",") t)))
 
-;; Archive site
-;; Emacs archives-site is isolated by GFW, use mirror site if no proxy in china
-(defun y/set-package-archives-official()
-  "Set package-archives to melpa.org if https-proxy enabled or FORCE non-nil."
-  (interactive)
-  (message "Set package-archives to melpa.org(official).")
-  (setq package-archives
-        '(("melpa-stable" . "https://stable.melpa.org/packages/")
-          ("melpa" . "https://melpa.org/packages/")
-          ("gnu" . "https://elpa.gnu.org/packages/")
-          ("org" . "http://orgmode.org/elpa/")
-          ("marmalade" . "https://marmalade-repo.org/packages/"))))
+(y/add-no-proxy-sites "*.cn"
+                      "*.aliyun.com"
+                      "*.tmall.com"
+                      "*.youku.com"
+                      "*.jd.com"
+                      "*.bing.com"
+                      "*.baidu.com"
+                      "*.csdn.net"
+                      "*.qq.com")
 
-(defun y/set-package-archives-mirror()
-  "Set package-archives to tsinghua if https-proxy disabled or FORCE non-nil."
-  (interactive)
-  (message "Set package-archives to tsinghua mirror.")
-  (setq package-archives
-        '(("gnu"   . "https://mirrors.tuna.tsinghua.edu.cn/elpa/gnu/")
-          ("org"   . "https://mirrors.tuna.tsinghua.edu.cn/elpa/org/")
-          ("melpa" . "https://mirrors.tuna.tsinghua.edu.cn/elpa/melpa/")
-          ("melpa-stable" .
-           "https://mirrors.tuna.tsinghua.edu.cn/elpa/melpa-stable/"))))
+(defconst y/package-archives-melpa
+  '(("melpa-stable" . "https://stable.melpa.org/packages/")
+    ("melpa" . "https://melpa.org/packages/")
+    ("gnu" . "https://elpa.gnu.org/packages/")
+    ("org" . "http://orgmode.org/elpa/")
+    ("marmalade" . "https://marmalade-repo.org/packages/"))
+  "MELPA package source from official site.")
+(defconst y/package-archives-mirror
+  '(("melpa-stable" . "https://mirrors.tuna.tsinghua.edu.cn/elpa/melpa-stable/")
+    ("melpa" . "https://mirrors.tuna.tsinghua.edu.cn/elpa/melpa/")
+    ("gnu" . "https://mirrors.tuna.tsinghua.edu.cn/elpa/gnu/")
+    ("org" . "https://mirrors.tuna.tsinghua.edu.cn/elpa/org/"))
+  "Mirror package source from tsinghua.")
+(defconst y/package-archives-mirror-http
+  '(("melpa-stable" . "http://mirrors.tuna.tsinghua.edu.cn/elpa/melpa-stable/")
+    ("melpa" . "http://mirrors.tuna.tsinghua.edu.cn/elpa/melpa/")
+    ("gnu" . "http://mirrors.tuna.tsinghua.edu.cn/elpa/gnu/")
+    ("org" . "http://mirrors.tuna.tsinghua.edu.cn/elpa/org/"))
+  "Mirror package source using http protocol from tsinghua.")
 
-;; It's not safe, only use if system does not support
-(defun y/set-package-archives-mirror-http()
-  "Set package-archives to tsinghua if https-proxy disabled or FORCE non-nil."
-  (interactive)
-  (message "Set package-archives to tsinghua mirror.")
-  (setq package-archives
-        '(("gnu"   . "http://mirrors.tuna.tsinghua.edu.cn/elpa/gnu/")
-          ("org"   . "http://mirrors.tuna.tsinghua.edu.cn/elpa/org/")
-          ("melpa" . "http://mirrors.tuna.tsinghua.edu.cn/elpa/melpa/")
-          ("melpa-stable" .
-           "http://mirrors.tuna.tsinghua.edu.cn/elpa/melpa-stable/"))))
-
-(if (or (getenv "EMACS_NO_MIRROR") (getenv "https_proxy"))
-    (y/set-package-archives-official)
-  (y/set-package-archives-mirror))
-
-;; FORCE_MIRROR env overrides NO_MIRROR or proxy
-(when (getenv "EMACS_FORCE_MIRROR")
-  (y/set-package-archives-mirror)
-  ;; Also remove proxy config.
-  (dolist (e '("http_proxy" "https_proxy" "HTTP_PROXY" "HTTPS_PROXY"))
-          (setenv e nil)))
-
-;; Set follow env if your system does not support https
-(when (getenv "EMACS_FORCE_MIRROR_HTTP")
-  (y/set-package-archives-mirror-http)
-  ;; Also remove proxy config.
-  (dolist (e '("http_proxy" "https_proxy" "HTTP_PROXY" "HTTPS_PROXY"))
-          (setenv e nil)))
-
-;;; package manage and org babel config
+(setq package-archives
+      (cond ((equal (getenv "EMACS_NO_MIRROR") "1") y/package-archives-melpa)
+            ((equal (getenv "EMACS_MIRROR_HTTP") "1")
+             y/package-archives-mirror-http)
+            (t y/package-archives-mirror)))
 
 (package-initialize)
 
@@ -257,10 +246,18 @@
 (use-package org-plus-contrib
   :pin org)
 
-;; load literate config.
-;; use env @EMACS_Y_INTERNAL_ESUP_PROFILER to prevent reload recursively.
-(when (and (file-exists-p user-init-config)
+;; use env @EMACS_Y_INTERNAL_ESUP_PROFILER to prevent esub reload recursively.
+(when (and (file-exists-p y/user-init-config)
            (not (string= (getenv "EMACS_Y_INTERNAL_ESUP_PROFILER") "y/esup")))
-  (org-babel-load-file user-init-config))
+  (let* ((config-el (y/file-replace-extension y/user-init-config "el")))
+    (when (file-newer-than-file-p y/user-init-config config-el)
+      (require 'ob-tangle)
+      (org-babel-tangle-file y/user-init-config config-el))
+    (byte-recompile-file config-el nil 0 t)))
+
+(defconst y/startup-end-seconds (float-time))
+(defconst y/startup-duration-seconds (- y/startup-end-seconds
+                                        y/startup-begin-seconds))
+(message "==> Emacs startup takes %.2f seconds." y/startup-duration-seconds)
 
 ;;; init.el ends here

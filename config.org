@@ -79,7 +79,7 @@ analyze config.org time proportion.
   ;; with option -L/-l to load esup, but until now init.el does not
   ;; loaded, so we need load init.el first.
   ;; Load if in esup.
-  (unless (boundp 'user-init-config)
+  (unless (boundp 'y/user-init-config)
     (let ((file (expand-file-name "init.el" user-emacs-directory)))
       (message "y/esup: Esup profiling, load %s now" file)
       (load-file file)))
@@ -92,7 +92,7 @@ analyze config.org time proportion.
     ;; https://github.com/jschaf/esup/issues/53
     (setq esup-depth 1)
     (setq esup-user-init-file
-          (expand-file-name (concat (file-name-base user-init-config) ".el")
+          (expand-file-name (concat (file-name-base y/user-init-config) ".el")
                             user-emacs-directory)))
 
   (defun y/esup-advice-before(&optional init-file)
@@ -256,7 +256,7 @@ See =C-h i (elisp) Defining Minor Modes= for details.
   (defun y/switch-buffer-config()
     "Switch buffer to user-init-config(default config.org)."
     (interactive)
-    (find-file user-init-config))
+    (find-file y/user-init-config))
   (defun y/kill-help()
     "Change to other window then quit-window."
     (interactive)
@@ -2372,7 +2372,7 @@ Refer to [[#header][header]] for more details.
     (defconst y/time-finish-seconds (float-time))
     (message "y/time-elapsed-time is %.3f seconds (file: %s and %s)"
              (- y/time-finish-seconds y/time-begin-seconds)
-             user-init-file user-init-config)
+             user-init-file y/user-init-config)
     (unintern 'y/time-finish-seconds nil)
     (unintern 'y/time-begin-seconds nil))
 
